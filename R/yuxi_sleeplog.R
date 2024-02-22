@@ -41,17 +41,17 @@ yuxi_sleeplog <- function(path, id, first) {
     
     # grab bed time and wake time
     file %>%
-      mutate(bedtime = paste(paste(BedTime.1_1, BedTime.2_1, sep=":"), BedTime.3_1, sep=" "),
+      dplyr::mutate(bedtime = paste(paste(BedTime.1_1, BedTime.2_1, sep=":"), BedTime.3_1, sep=" "),
              waketime = paste(paste(WakeTime.1_1, WakeTime.2_1, sep=":"), WakeTime.3_1, sep=" ")) -> file
   
     # grab reference date (remind yuxi this is only correct if no binged)
     # remind yuxi do not open the .csv from the zip
     file %>% tidyr::separate (EndDate, c("eDate", "eTime"), " ", fill = "right", remove= FALSE) %>%
-      mutate(date = as.Date(eDate, "%Y-%m-%d")-1) %>%
-      rename(reportdate = eDate) -> file
+      dplyr::mutate(date = as.Date(eDate, "%Y-%m-%d")-1) %>%
+      dplyr::rename(reportdate = eDate) -> file
     
     # trim
-    file %>% select(., qid, qualtrics_day, date, bedtime, waketime, reportdate) -> file
+    file %>% dplyr::select(., qid, qualtrics_day, date, bedtime, waketime, reportdate) -> file
     
     # consolidate
     log <- readRDS (paste(path, "/sleeplog.rds", sep=""))
@@ -117,6 +117,6 @@ yuxi_sleeplog <- function(path, id, first) {
   
 # library(dplyr)
 # yuxi_sleeplog(path = '/Users/phoebelam/Desktop/yuxi',
-#               id = 101, 
-#               first = '2024-02-19')
+#               id = 101,
+#               first = '2024-02-20')
 
