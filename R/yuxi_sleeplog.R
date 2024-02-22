@@ -80,7 +80,7 @@ yuxi_sleeplog <- function(path, id, first) {
     log %>%
       dplyr::mutate_at(dplyr::vars(shoulddate, reportdate),
                        list(~as.Date(.))) %>% 
-      dplyr::mutate(compliance = case_when(shoulddate-reportdate==0~ 'ok',
+      dplyr::mutate(compliance = dplyr::case_when(shoulddate-reportdate==0~ 'ok',
                                            shoulddate-reportdate>0~ 'late',
                                            is.na(shoulddate-reportdate)==T~ 'missing')) -> log
     
