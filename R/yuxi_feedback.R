@@ -28,7 +28,7 @@ yuxi_feedback <- function (path, id, first) {
     as.data.frame(.) %>% 
     dplyr::mutate(`Hours in bed` = Total.Time..mins./60,
            `Hours of actual sleep` = Sleep.Time..mins./60) %>% 
-    rename(`Sleep efficiency: Percent of time sleeping while in bed` = sleepeff,
+    dplyr::rename(`Sleep efficiency: Percent of time sleeping while in bed` = sleepeff,
            `Number of awakenings` = Number.of.Awakenings,
            `Number of minutes it took to fall asleep` = latency) %>% 
     dplyr::select(., `Hours in bed` , `Hours of actual sleep`, `Sleep efficiency: Percent of time sleeping while in bed`, 
@@ -36,10 +36,10 @@ yuxi_feedback <- function (path, id, first) {
     t() %>% 
     as.data.frame(.) %>%
     tibble::rownames_to_column(.) %>% 
-    rename(`Sleep characteristics` = 1) %>% 
+    dplyr::rename(`Sleep characteristics` = 1) %>% 
     dplyr::mutate_at(vars(mean, min, max),
               list(~round(., 1))) %>%
-    rename(`Average across days` = mean,
+    dplyr::rename(`Average across days` = mean,
            `Minimum value avross days` = min,
            `Maximum value across days` = max)-> summary
   
@@ -57,7 +57,7 @@ yuxi_feedback <- function (path, id, first) {
     url <- paste0("file:///", gsub("\\\\", "/", normalizePath(path)))
     webshot(url,
             file = file,
-            dplyr::selector = ".formattable_widget",
+            selector = ".formattable_widget",
             delay = delay)
   }
   
