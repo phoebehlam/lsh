@@ -64,12 +64,12 @@ yuxi_feedback <- function (path, id, first) {
   
   if (file.exists(paste(path, "/", id, sep=""))){
     
-    export_formattable(table, paste(path, "/table.pdf", sep=""))
+    export_formattable(table, paste(path, "/", id, "/table.pdf", sep=""))
     
   } else {
     
     dir.create(paste(path, "/", id, sep=""))
-    export_formattable(table, paste(path, "/table.pdf", sep=""))
+    export_formattable(table, paste(path, "/", id, "/table.pdf", sep=""))
     
   }
   
@@ -192,7 +192,7 @@ yuxi_feedback <- function (path, id, first) {
   # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig2.pdf",
   #     width = 9.75, height = 5.32)
   
-  pdf(paste(path, "/", id, "/fig1.pdf", sep=""),
+  pdf(paste(path, "/", id, "/fig2.pdf", sep=""),
        width = 9.75, height = 5.32)
   e
   dev.off()
@@ -293,7 +293,7 @@ yuxi_feedback <- function (path, id, first) {
   # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig3.pdf",
   #     width = 9.75, height = 5.32)
   
-  pdf(paste(path, "/", id, "/fig1.pdf", sep=""),
+  pdf(paste(path, "/", id, "/fig3.pdf", sep=""),
        width = 9.75, height = 5.32)
   g
   dev.off()
@@ -360,7 +360,7 @@ yuxi_feedback <- function (path, id, first) {
   # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig4.pdf",
   #     width = 9.75, height = 5.32)
   
-  pdf(paste(path, "/", id, "/fig1.pdf", sep=""),
+  pdf(paste(path, "/", id, "/fig4.pdf", sep=""),
        width = 9.75, height = 5.32)
   corr
   dev.off()
