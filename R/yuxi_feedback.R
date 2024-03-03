@@ -11,33 +11,33 @@ yuxi_feedback <- function (path, id, first) {
   #dat <- read.csv('/Users/yuxixie/Downloads/yuxi_feedback form/Yuxi_0205coded_Yuxi.csv', header = T)
   
   dat %>% 
-    mutate(sleepeff = round(Sleep.Percent.Onset.to.Offset, 1),
+    dplyr::mutate(sleepeff = round(Sleep.Percent.Onset.to.Offset, 1),
            latency = Sleep.Onset.Latency..mins.,
-           startdate_adj = case_when(as.Date(End.Date, "%m/%d/%Y") -as.Date(Start.Date, "%m/%d/%Y")==0~ as.Date(Start.Date, "%m/%d/%Y")-1,
+           startdate_adj = dplyr::case_when(as.Date(End.Date, "%m/%d/%Y") -as.Date(Start.Date, "%m/%d/%Y")==0~ as.Date(Start.Date, "%m/%d/%Y")-1,
                                      TRUE~ as.Date(Start.Date, "%m/%d/%Y")),
            awakening = round(Mean.Awakening..mins.*Number.of.Awakenings, 2),
            duration = round(Sleep.Time..mins./60, 1)) -> dat
   
   # summary table
   dat %>%
-    select(., Total.Time..mins., Sleep.Time..mins., sleepeff, Number.of.Awakenings, latency) %>%
+    dplyr::select(., Total.Time..mins., Sleep.Time..mins., sleepeff, Number.of.Awakenings, latency) %>%
     psych::describe(.) %>%
     as.data.frame(.) %>% 
-    select(., mean, min, max) %>% 
+    dplyr::select(., mean, min, max) %>% 
     t() %>% 
     as.data.frame(.) %>% 
-    mutate(`Hours in bed` = Total.Time..mins./60,
+    dplyr::mutate(`Hours in bed` = Total.Time..mins./60,
            `Hours of actual sleep` = Sleep.Time..mins./60) %>% 
     rename(`Sleep efficiency: Percent of time sleeping while in bed` = sleepeff,
            `Number of awakenings` = Number.of.Awakenings,
            `Number of minutes it took to fall asleep` = latency) %>% 
-    select(., `Hours in bed` , `Hours of actual sleep`, `Sleep efficiency: Percent of time sleeping while in bed`, 
+    dplyr::select(., `Hours in bed` , `Hours of actual sleep`, `Sleep efficiency: Percent of time sleeping while in bed`, 
            `Number of minutes it took to fall asleep`, `Number of awakenings`) %>%
     t() %>% 
     as.data.frame(.) %>%
     tibble::rownames_to_column(.) %>% 
     rename(`Sleep characteristics` = 1) %>% 
-    mutate_at(vars(mean, min, max),
+    dplyr::mutate_at(vars(mean, min, max),
               list(~round(., 1))) %>%
     rename(`Average across days` = mean,
            `Minimum value avross days` = min,
@@ -57,7 +57,7 @@ yuxi_feedback <- function (path, id, first) {
     url <- paste0("file:///", gsub("\\\\", "/", normalizePath(path)))
     webshot(url,
             file = file,
-            selector = ".formattable_widget",
+            dplyr::selector = ".formattable_widget",
             delay = delay)
   }
   
@@ -68,67 +68,67 @@ yuxi_feedback <- function (path, id, first) {
   # figures
   # sleep duration
   dat %>% 
-    ggplot( aes(x=startdate_adj, y=duration)) +
-    geom_line(color="#A9A9A9", aes(group=1), linewidth = 1) +
-    geom_point(shape=21, color="#637A9F", fill="#637A9F", size=3, alpha=.8) +
-    geom_text(aes(label = duration), hjust=0.5, vjust=-1, size = 4) +
-    theme_minimal() + 
-    ggtitle("Sleep duration: Hours of actual sleep") +
-    ylab('') +
-    ylim(min(dat$duration)-1, max(dat$duration)+1) +
-    scale_x_date("", date_breaks = "days" , date_labels = "%b-%d")+
-    ggplot2::theme(plot.title=element_text(face="bold", size = 15)) -> a
+    ggplot2::ggplot( aes(x=startdate_adj, y=duration)) +
+    ggplot2::geom_line(color="#A9A9A9", aes(group=1), linewidth = 1) +
+    ggplot2::geom_point(shape=21, color="#637A9F", fill="#637A9F", size=3, alpha=.8) +
+    ggplot2::geom_text(aes(label = duration), hjust=0.5, vjust=-1, size = 4) +
+    ggplot2::theme_minimal() + 
+    ggplot2::ggtitle("Sleep duration: Hours of actual sleep") +
+    ggplot2::ylab('') +
+    ggplot2::ylim(min(dat$duration)-1, max(dat$duration)+1) +
+    ggplot2::scale_x_date("", date_breaks = "days" , date_labels = "%b-%d")+
+    theme(plot.title=element_text(face="bold", size = 15)) -> a
   
   # sleep efficiency
   dat %>% 
-    ggplot( aes(x=startdate_adj, y=sleepeff)) +
-    geom_line(color="#A9A9A9", aes(group=1), linewidth = 1) +
-    geom_point(shape=21, color="#637A9F", fill="#637A9F", size=3, alpha=.8) +
-    geom_text(aes(label = sleepeff), hjust=0.5, vjust=-1, size = 4) +
-    theme_minimal() + 
-    ggtitle("Sleep efficiency: Percent of time sleeping while in bed") +
-    ylab('') +
-    ylim(min(dat$sleepeff)-3, 105) +
-    scale_x_date("", date_breaks = "days" , date_labels = "%b-%d")+
+    ggplot2::ggplot( aes(x=startdate_adj, y=sleepeff)) +
+    ggplot2::geom_line(color="#A9A9A9", aes(group=1), linewidth = 1) +
+    ggplot2::geom_point(shape=21, color="#637A9F", fill="#637A9F", size=3, alpha=.8) +
+    ggplot2::geom_text(aes(label = sleepeff), hjust=0.5, vjust=-1, size = 4) +
+    ggplot2::theme_minimal() + 
+    ggplot2::ggtitle("Sleep efficiency: Percent of time sleeping while in bed") +
+    ggplot2::ylab('') +
+    ggplot2::ylim(min(dat$sleepeff)-3, 105) +
+    ggplot2::scale_x_date("", date_breaks = "days" , date_labels = "%b-%d")+
     ggplot2::theme(plot.title=element_text(face="bold", size = 15)) -> b
   
   #latency
   dat %>% 
-    ggplot( aes(x=startdate_adj, y=latency)) +
-    geom_line(color="#A9A9A9", aes(group=1), size = 1) +
-    geom_point(shape=21, color="#637A9F", fill="#637A9F", size=3, alpha=.9) +
-    geom_text(aes(label = latency), hjust=0.5, vjust=-1, size = 4) +
-    theme_minimal() + 
-    ggtitle("Number of minutes it took to fall asleep") +
-    ylab('') +
-    ylim(min(dat$latency)-3, max(dat$latency)+3)+
-    scale_x_date("", date_breaks = "days" , date_labels = "%b-%d")+
+    ggplot2::ggplot( aes(x=startdate_adj, y=latency)) +
+    ggplot2::geom_line(color="#A9A9A9", aes(group=1), size = 1) +
+    ggplot2::geom_point(shape=21, color="#637A9F", fill="#637A9F", size=3, alpha=.9) +
+    ggplot2::geom_text(aes(label = latency), hjust=0.5, vjust=-1, size = 4) +
+    ggplot2::theme_minimal() + 
+    ggplot2::ggtitle("Number of minutes it took to fall asleep") +
+    ggplot2::ylab('') +
+    ggplot2::ylim(min(dat$latency)-3, max(dat$latency)+3)+
+    ggplot2::scale_x_date("", date_breaks = "days" , date_labels = "%b-%d")+
     ggplot2::theme(plot.title=element_text(face="bold", size = 15)) -> c
   
   #awakening minutes total
   # dat %>% 
-  #   ggplot( aes(x=startdate_adj, y=awakening)) +
-  #   geom_line(color="#A9A9A9", aes(group=1), size = 1) +
-  #   geom_point(shape=21, color="#637A9F", fill="#637A9F", size=3, alpha=.9) +
-  #   geom_text(aes(label = awakening), hjust=0.5, vjust=-1, size = 4) +
-  #   theme_minimal() + 
-  #   ggtitle("Awakenings (in minutes)") +
-  #   ylab('') +
-  #   ylim(min(dat$awakening)-3, max(dat$awakening)+3) +
-  #   scale_x_date("In-Bed Date", date_breaks = "days" , date_labels = "%b-%d")
+  #   ggplot2::ggplot( aes(x=startdate_adj, y=awakening)) +
+  #   ggplot2::geom_line(color="#A9A9A9", aes(group=1), size = 1) +
+  #   ggplot2::geom_point(shape=21, color="#637A9F", fill="#637A9F", size=3, alpha=.9) +
+  #   ggplot2::geom_text(aes(label = awakening), hjust=0.5, vjust=-1, size = 4) +
+  #   ggplot2::theme_minimal() + 
+  #   ggplot2::ggtitle("Awakenings (in minutes)") +
+  #   ggplot2::ylab('') +
+  #   ggplot2::ylim(min(dat$awakening)-3, max(dat$awakening)+3) +
+  #   ggplot2::scale_x_date("In-Bed Date", date_breaks = "days" , date_labels = "%b-%d")
   
   #awakening number
   dat %>% 
-    ggplot( aes(x=startdate_adj, y=Number.of.Awakenings)) +
-    geom_line(color="#A9A9A9", aes(group=1), size = 1) +
-    geom_point(shape=21, color="#637A9F", fill="#637A9F", size=3, alpha=.9) +
-    geom_text(aes(label = Number.of.Awakenings), hjust=0.5, vjust=-1, size = 4) +
-    theme_minimal() + 
-    ggtitle("Number of awakenings") +
-    xlab('') +
-    ylab('') +
-    ylim(min(dat$Number.of.Awakenings)-3, max(dat$Number.of.Awakenings)+3) +
-    scale_x_date("\nIn-Bed Date", date_breaks = "days" , date_labels = "%b-%d") +
+    ggplot2::ggplot( aes(x=startdate_adj, y=Number.of.Awakenings)) +
+    ggplot2::geom_line(color="#A9A9A9", aes(group=1), size = 1) +
+    ggplot2::geom_point(shape=21, color="#637A9F", fill="#637A9F", size=3, alpha=.9) +
+    ggplot2::geom_text(aes(label = Number.of.Awakenings), hjust=0.5, vjust=-1, size = 4) +
+    ggplot2::theme_minimal() + 
+    ggplot2::ggtitle("Number of awakenings") +
+    ggplot2::xlab('') +
+    ggplot2::ylab('') +
+    ggplot2::ylim(min(dat$Number.of.Awakenings)-3, max(dat$Number.of.Awakenings)+3) +
+    ggplot2::scale_x_date("\nIn-Bed Date", date_breaks = "days" , date_labels = "%b-%d") +
     ggplot2::theme(plot.title=element_text(face="bold", size = 15))-> d
   
   # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig1.pdf",
@@ -226,9 +226,9 @@ yuxi_feedback <- function (path, id, first) {
                        list(r = ~(as.numeric(.)-6)*-1)) %>%
       dplyr::mutate_at(vars(PSS_3, PSS_4, PSS_5),
                        list(~as.numeric(.))) %>%
-      rowwise() %>%
+      dplyr::rowwise() %>%
       dplyr::mutate(pss_mean = hablar::mean_(c(PSS_1_r, PSS_2_r, PSS_3, PSS_4, PSS_5))) %>%
-      ungroup() -> file
+      dplyr::ungroup() -> file
     
     file %>% tidyr::separate (EndDate, c("eDate", "eTime"), " ", fill = "right", remove= FALSE) %>% 
       dplyr::rename(reportdate = eDate) -> file
@@ -244,7 +244,7 @@ yuxi_feedback <- function (path, id, first) {
   }
   
   log <- readRDS (paste(path, "/night.rds", sep="")) [-1,-1] %>%
-    mutate(qualtrics_day = as.numeric(qualtrics_day)) %>% arrange(qualtrics_day)
+    dplyr::mutate(qualtrics_day = as.numeric(qualtrics_day)) %>% arrange(qualtrics_day)
   
   # use of "should" date instead of actual report date in case of late entries
   should <- c(as.Date(first), as.Date(first)+1, as.Date(first)+2, as.Date(first)+3, as.Date(first)+4, as.Date(first)+5, 
@@ -260,21 +260,21 @@ yuxi_feedback <- function (path, id, first) {
     dplyr::mutate(pss_pomp = 100*((pss_mean-1)/(5-1))) -> log
   
   log %>% 
-    ggplot( aes(x=shoulddate, y=pss_pomp)) +
-    geom_line(color="#A9A9A9", aes(group=1), size = 1) +
-    geom_point(shape=21, color="#637A9F", fill="#637A9F", size=3, alpha=.9) +
-    geom_text(aes(label = pss_pomp), hjust=0.5, vjust=-1, size = 4) +
-    theme_minimal() + 
-    ggtitle("Perceived stress level (0-100%)") +
-    xlab('') +
-    ylab('') +
-    ylim(0, 110) +
-    scale_x_date("\nIn-Bed Date", date_breaks = "days" , date_labels = "%b-%d") +
-    geom_hline(yintercept=mean(log$pss_pomp), linetype="dashed", color = "#637A9F", size = .8) +
-    xlim(min(log$shoulddate), max(log$shoulddate)+.1) +
-    annotate("text", x= log$shoulddate[nrow(log)]-0.3, y = mean(log$pss_pomp)-3,
+    ggplot2::ggplot( aes(x=shoulddate, y=pss_pomp)) +
+    ggplot2::geom_line(color="#A9A9A9", aes(group=1), size = 1) +
+    ggplot2::geom_point(shape=21, color="#637A9F", fill="#637A9F", size=3, alpha=.9) +
+    ggplot2::geom_text(aes(label = pss_pomp), hjust=0.5, vjust=-1, size = 4) +
+    ggplot2::theme_minimal() + 
+    ggplot2::ggtitle("Perceived stress level (0-100%)") +
+    ggplot2::xlab('') +
+    ggplot2::ylab('') +
+    ggplot2::ylim(0, 110) +
+    ggplot2::scale_x_date("\nIn-Bed Date", date_breaks = "days" , date_labels = "%b-%d") +
+    ggplot2::geom_hline(yintercept=mean(log$pss_pomp), linetype="dashed", color = "#637A9F", size = .8) +
+    ggplot2::xlim(min(log$shoulddate), max(log$shoulddate)+.1) +
+    ggplot2::annotate("text", x= log$shoulddate[nrow(log)]-0.3, y = mean(log$pss_pomp)-3,
              label = paste("Your average"), color = '#637A9F', size = 4, fontface = 'bold') +
-    theme(plot.title=element_text(face="bold", size = 15)) ->g
+    ggplot2::theme(plot.title=element_text(face="bold", size = 15)) ->g
   
   
   # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig3.pdf",
@@ -288,11 +288,11 @@ yuxi_feedback <- function (path, id, first) {
   #stress and sleep merge
   #startdate_adj from sleep
   #should date from stress
-  merge(select(dat, startdate_adj, sleepeff, latency, awakening, duration, Number.of.Awakenings), select(log, shoulddate, everything()), 
+  merge(dplyr::select(dat, startdate_adj, sleepeff, latency, awakening, duration, Number.of.Awakenings), dplyr::select(log, shoulddate, everything()), 
         by.x = 'startdate_adj', by.y= 'shoulddate', all=T) -> new
   
   new %>%
-    mutate(pss_pomp_10 = pss_pomp/10) -> new
+    dplyr::mutate(pss_pomp_10 = pss_pomp/10) -> new
   
   
   
@@ -304,8 +304,8 @@ yuxi_feedback <- function (path, id, first) {
                                    lm(sleepeff~pss_pomp_10, data = new)$coefficients[2],
                                    lm(latency~pss_pomp_10, data = new)$coefficients[2],
                                    lm(Number.of.Awakenings~pss_pomp_10, data = new)$coefficients[2])) %>%
-    mutate(sign = as.character(sign(coef)),
-           label = case_when(sign == -1 & type == 'Sleep duration: \nHours of actual sleep'~ paste('Decreases by ', abs(round(coef, 1)), ' hours', sep=""),
+    dplyr::mutate(sign = as.character(sign(coef)),
+           label = dplyr::case_when(sign == -1 & type == 'Sleep duration: \nHours of actual sleep'~ paste('Decreases by ', abs(round(coef, 1)), ' hours', sep=""),
                              sign == 1 & type == 'Sleep duration: \nHours of actual sleep'~ paste('Increases by ', abs(round(coef, 1)), ' hours', sep=""),
                              sign == -1 & type == 'Sleep efficiency: Percent of \ntime sleeping while in bed'~ paste('Decreases by ', abs(round(coef, 2)), '%', sep=""),
                              sign == 1 & type == 'Sleep efficiency: Percent of \ntime sleeping while in bed'~ paste('Increases by ', abs(round(coef, 2)), '%', sep=""),
@@ -313,32 +313,32 @@ yuxi_feedback <- function (path, id, first) {
                              sign == 1 & type == 'Number of minutes \nit took to fall asleep'~ paste('Increases by ', abs(round(coef, 1)), ' minutes', sep=""),
                              sign == -1 & type == 'Number of awakenings'~ paste('Decreases by ', abs(round(coef, 1)), ' times', sep=""),
                              sign == 1 & type == 'Number of awakenings'~ paste('Increases by ', abs(round(coef, 1)), ' times', sep=""))) %>%
-    mutate(label_pos = case_when(sign == 1~ label),
-           label_neg = case_when(sign == -1~ label))
+    dplyr::mutate(label_pos = dplyr::case_when(sign == 1~ label),
+           label_neg = dplyr::case_when(sign == -1~ label))
   
   
   
-  ggplot(sleepcorr, aes(x=type, y=coef, fill = sign)) + 
-    geom_bar(stat = "identity") +
-    xlab("") +
-    ggtitle("For every 10% increase in perceived stress...") +
-    ylab("") +
-    coord_flip() +
-    theme_minimal() +
-    ylim(min(sleepcorr$coef, na.rm=T)-3, max(sleepcorr$coef, na.rm=T)+3) +
-    scale_fill_manual(values=c("#e8a093", 
+  ggplot2::ggplot(sleepcorr, aes(x=type, y=coef, fill = sign)) + 
+    ggplot2::geom_bar(stat = "identity") +
+    ggplot2::xlab("") +
+    ggplot2::ggtitle("For every 10% increase in perceived stress...") +
+    ggplot2::ylab("") +
+    ggplot2::coord_flip() +
+    ggplot2::theme_minimal() +
+    ggplot2::ylim(min(sleepcorr$coef, na.rm=T)-3, max(sleepcorr$coef, na.rm=T)+3) +
+    ggplot2::scale_fill_manual(values=c("#e8a093", 
                                "#637A9F")) +
-    theme(legend.position = "none",
+    ggplot2::theme(legend.position = "none",
           axis.text.x=element_blank(), 
           axis.ticks.x=element_blank(),
           text = element_text(size = 14),
           plot.title = element_text(hjust = .5, face="bold")) +
-    geom_label(
+    ggplot2::geom_label(
       aes(label = label_neg), 
       hjust = 1,
       size = 4, fontface = "bold",
       fill = "white", label.size = 0) +
-    geom_label(
+    ggplot2::geom_label(
       aes(label = label_pos), 
       hjust = -sleepcorr$coef[2],
       size = 4, fontface = "bold",
