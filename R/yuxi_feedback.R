@@ -357,9 +357,12 @@ yuxi_feedback <- function (path, id, first) {
   
 }
 
-
-
-
+# library(formattable)
+# library(htmltools)
+# library(webshot)
+# yuxi_feedback(path = '/Users/phoebelam/Desktop/yuxi',
+#               id = 101,
+#               first = '2024-02-20')
 
 
 
