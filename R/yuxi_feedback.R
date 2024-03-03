@@ -149,7 +149,7 @@ yuxi_feedback <- function (path, id, first) {
   
   pdf(paste(path, "/", id, "/fig1.pdf", sep=""),
       width = 9.75, height = 10.64)
-  ggpubr::ggarrange(a, b, c, d, ncol=1)
+  print(ggpubr::ggarrange(a, b, c, d, ncol=1))
   dev.off()
   
   #sleep onset and offset time
@@ -194,7 +194,7 @@ yuxi_feedback <- function (path, id, first) {
   
   pdf(paste(path, "/", id, "/fig2.pdf", sep=""),
        width = 9.75, height = 5.32)
-  e
+  print(e)
   dev.off()
   
   
@@ -295,7 +295,7 @@ yuxi_feedback <- function (path, id, first) {
   
   pdf(paste(path, "/", id, "/fig3.pdf", sep=""),
        width = 9.75, height = 5.32)
-  g
+  print(g)
   dev.off()
   
   #stress and sleep merge
@@ -362,7 +362,7 @@ yuxi_feedback <- function (path, id, first) {
   
   pdf(paste(path, "/", id, "/fig4.pdf", sep=""),
        width = 9.75, height = 5.32)
-  corr
+  print(corr)
   dev.off()
   
   return('Done exporting figures, please check folder')
