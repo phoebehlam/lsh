@@ -61,7 +61,20 @@ yuxi_feedback <- function (path, id, first) {
             delay = delay)
   }
   
-  export_formattable(table, paste(path, "/table.pdf", sep=""))
+  
+  if (file.exists(paste(path, "/", id, sep=""))){
+    
+    export_formattable(table, paste(path, "/table.pdf", sep=""))
+    
+  } else {
+    
+    dir.create(paste(path, "/", id, sep=""))
+    export_formattable(table, paste(path, "/table.pdf", sep=""))
+    
+  }
+  
+  
+  
   
   # export_formattable(table,"/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/table.pdf")
   
@@ -134,7 +147,7 @@ yuxi_feedback <- function (path, id, first) {
   # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig1.pdf",
   #     width = 9.75, height = 10.64)
   
-  pdf( paste(path, "/fig1.pdf", sep=""),
+  pdf(paste(path, "/", id, "/fig1.pdf", sep=""),
       width = 9.75, height = 10.64)
   ggpubr::ggarrange(a, b, c, d, ncol=1)
   dev.off()
@@ -179,7 +192,7 @@ yuxi_feedback <- function (path, id, first) {
   # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig2.pdf",
   #     width = 9.75, height = 5.32)
   
-  pdf( paste(path, "/fig2.pdf", sep=""),
+  pdf(paste(path, "/", id, "/fig1.pdf", sep=""),
        width = 9.75, height = 5.32)
   e
   dev.off()
@@ -280,7 +293,7 @@ yuxi_feedback <- function (path, id, first) {
   # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig3.pdf",
   #     width = 9.75, height = 5.32)
   
-  pdf( paste(path, "/fig3.pdf", sep=""),
+  pdf(paste(path, "/", id, "/fig1.pdf", sep=""),
        width = 9.75, height = 5.32)
   g
   dev.off()
@@ -347,7 +360,7 @@ yuxi_feedback <- function (path, id, first) {
   # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig4.pdf",
   #     width = 9.75, height = 5.32)
   
-  pdf( paste(path, "/fig4.pdf", sep=""),
+  pdf(paste(path, "/", id, "/fig1.pdf", sep=""),
        width = 9.75, height = 5.32)
   corr
   dev.off()
