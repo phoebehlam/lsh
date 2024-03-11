@@ -1,6 +1,6 @@
 #'@importFrom magrittr "%>%"
 #'@export
-yuxi_feedback <- function (path, id, first) {
+yuxi_feedback <- function (path, pid, first) {
   
   filenames = intersect(list.files(path = path, pattern = "scored sleep", full.names = T, recursive = F), 
                         list.files(path = path, pattern = ".csv", full.names = T, recursive = F))
@@ -202,7 +202,7 @@ yuxi_feedback <- function (path, id, first) {
   # path = '/Users/phoebelam/Desktop/yuxi'
   # id = 101
   # first = '2024-02-20'
-  log <- data.frame(qid = 999,
+  log <- data.frame(pid = 999,
                     qualtrics_day = 999, 
                     reportdate = as.Date('2024-01-01', '%Y-%m-%d'),
                     pss_mean = 999)
@@ -228,10 +228,10 @@ yuxi_feedback <- function (path, id, first) {
     
     # grab id - need to tell yuxi about external reference + do not change the name of the ID column after this
     file %>% 
-      dplyr::rename (qid = ExternalReference) %>%
       dplyr::mutate(qualtrics_day = daynum) %>%
-      dplyr::select (., qid, qualtrics_day, PSS_1:PSS_5, EndDate) %>%
-      dplyr::filter (qid == id)-> file
+      dplyr::select (., PID, qualtrics_day, PSS_1:PSS_5, EndDate) %>%
+      dplyr::filter (PID == pid) %>%
+      dplyr::rename(pid = PID)-> file
     
     # score mean
     file %>%
@@ -247,7 +247,7 @@ yuxi_feedback <- function (path, id, first) {
       dplyr::rename(reportdate = eDate) -> file
     
     # trim
-    file %>% dplyr::select(., qid, qualtrics_day, reportdate, pss_mean) -> file
+    file %>% dplyr::select(., pid, qualtrics_day, reportdate, pss_mean) -> file
     
     # consolidate
     log <- readRDS (paste(path, "/night.rds", sep=""))
