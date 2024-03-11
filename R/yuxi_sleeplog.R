@@ -1,6 +1,6 @@
 #'@importFrom magrittr "%>%"
 #'@export
-yuxi_sleeplog <- function(path, pid, first) {
+yuxi_sleeplog <- function(path, id, first) {
   
   
   log <- data.frame(matrix(ncol = 1, nrow = 1))
@@ -11,7 +11,7 @@ yuxi_sleeplog <- function(path, pid, first) {
                         list.files(path = path, pattern = ".csv", full.names = T, recursive = F))
   
   # troubleshoot
-  # file <- read.csv("/Users/phoebelam/Desktop/yuxi/Dissertation-Morning Day 1_February 22, 2024_13.26.csv" )
+  # file <- read.csv("/Users/phoebelam/Desktop/yuxi/Dissertation-Morning Day 1-Updated_March 11, 2024_13.57.csv")
   # 
   # file %>% 
   #   dplyr::filter (EMAIL == 'test1') %>%
@@ -25,19 +25,24 @@ yuxi_sleeplog <- function(path, pid, first) {
     
     print (f)
     
+    
     file<-read.csv(f)
     
     # remind yuxi to not change the name of the survey ever
+    
     basename(f) %>%
-      gsub ("Dissertation-Morning Day |_", " ", .) %>%
+      gsub ("Dissertation-Morning Day |-", " ", .) %>%
       substr(., 1, 3) -> daynum
+  
+    
     
     # grab id - need to tell yuxi about external reference + do not change the name of the ID column after this
     file %>% 
       dplyr::rename (pid = PID) %>%
       dplyr::mutate(qualtrics_day = daynum) %>%
       dplyr::select (., qualtrics_day, StartDate, EndDate, pid, BedTime.1_1:WakeTime.3_1) %>%
-      dplyr::filter (pid == pid)-> file
+      dplyr::filter (pid == id)-> file
+
     
     # grab bed time and wake time
     file %>%
@@ -77,6 +82,7 @@ yuxi_sleeplog <- function(path, pid, first) {
     log %>% dplyr::mutate(qualtrics_day = as.numeric(qualtrics_day)) -> log
     merge(log, should, by = 'qualtrics_day', all=T) -> log
     
+
     log %>%
       dplyr::mutate_at(dplyr::vars(shoulddate, reportdate),
                        list(~as.Date(.))) %>% 
