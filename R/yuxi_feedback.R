@@ -40,7 +40,7 @@ yuxi_feedback <- function (path, pid, first) {
     dplyr::mutate_at(vars(mean, min, max),
               list(~round(., 1))) %>%
     dplyr::rename(`Average across days` = mean,
-           `Minimum value avross days` = min,
+           `Minimum value across days` = min,
            `Maximum value across days` = max)-> summary
   
   formattable(summary, 
