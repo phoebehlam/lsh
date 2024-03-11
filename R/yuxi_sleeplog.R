@@ -37,7 +37,7 @@ yuxi_sleeplog <- function(path, pid, first) {
       dplyr::rename (pid = PID) %>%
       dplyr::mutate(qualtrics_day = daynum) %>%
       dplyr::select (., qualtrics_day, StartDate, EndDate, pid, BedTime.1_1:WakeTime.3_1) %>%
-      dplyr::filter (pid == id)-> file
+      dplyr::filter (pid == pid)-> file
     
     # grab bed time and wake time
     file %>%
