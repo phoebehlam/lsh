@@ -29,7 +29,7 @@ yuxi_sleeplog <- function(path, id, first) {
     
     # remind yuxi to not change the name of the survey ever
     basename(f) %>%
-      gsub ("Dissertation-Morning+Day+|_", " ", .) %>%
+      gsub ("Dissertation-Morning Day |_", " ", .) %>%
       substr(., 1, 3) -> daynum
     
     # grab id - need to tell yuxi about external reference + do not change the name of the ID column after this
