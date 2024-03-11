@@ -34,10 +34,10 @@ yuxi_sleeplog <- function(path, id, first) {
     
     # grab id - need to tell yuxi about external reference + do not change the name of the ID column after this
     file %>% 
-      dplyr::rename (qid = ExternalReference) %>%
+      dplyr::rename (pid = PID) %>%
       dplyr::mutate(qualtrics_day = daynum) %>%
-      dplyr::select (., qualtrics_day, StartDate, EndDate, qid, BedTime.1_1:WakeTime.3_1) %>%
-      dplyr::filter (qid == id)-> file
+      dplyr::select (., qualtrics_day, StartDate, EndDate, pid, BedTime.1_1:WakeTime.3_1) %>%
+      dplyr::filter (pid == id)-> file
     
     # grab bed time and wake time
     file %>%
@@ -51,7 +51,7 @@ yuxi_sleeplog <- function(path, id, first) {
       dplyr::rename(reportdate = eDate) -> file
     
     # trim
-    file %>% dplyr::select(., qid, qualtrics_day, date, bedtime, waketime, reportdate) -> file
+    file %>% dplyr::select(., pid, qualtrics_day, date, bedtime, waketime, reportdate) -> file
     
     # consolidate
     log <- readRDS (paste(path, "/sleeplog.rds", sep=""))
@@ -95,7 +95,7 @@ yuxi_sleeplog <- function(path, id, first) {
     
     # rename for output purpose
     log %>%
-      dplyr::rename(id = qid,
+      dplyr::rename(pid = pid,
              `qualtrics diary day` = qualtrics_day,
              `alleged sleep date` = date,
              `date reported sleep` = reportdate,
