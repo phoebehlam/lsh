@@ -62,14 +62,14 @@ yuxi_feedback <- function (path, pid, first) {
   }
   
   
-  if (file.exists(paste(path, "/", id, sep=""))){
+  if (file.exists(paste(path, "/", pid, sep=""))){
     
-    export_formattable(table, paste(path, "/", id, "/table.pdf", sep=""))
+    export_formattable(table, paste(path, "/", pid, "/table.pdf", sep=""))
     
   } else {
     
-    dir.create(paste(path, "/", id, sep=""))
-    export_formattable(table, paste(path, "/", id, "/table.pdf", sep=""))
+    dir.create(paste(path, "/", pid, sep=""))
+    export_formattable(table, paste(path, "/", pid, "/table.pdf", sep=""))
     
   }
   
@@ -147,7 +147,7 @@ yuxi_feedback <- function (path, pid, first) {
   # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig1.pdf",
   #     width = 9.75, height = 10.64)
   
-  pdf(paste(path, "/", id, "/fig1.pdf", sep=""),
+  pdf(paste(path, "/", pid, "/fig1.pdf", sep=""),
       width = 9.75, height = 10.64)
   print(ggpubr::ggarrange(a, b, c, d, ncol=1))
   dev.off()
@@ -192,7 +192,7 @@ yuxi_feedback <- function (path, pid, first) {
   # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig2.pdf",
   #     width = 9.75, height = 5.32)
   
-  pdf(paste(path, "/", id, "/fig2.pdf", sep=""),
+  pdf(paste(path, "/", pid, "/fig2.pdf", sep=""),
        width = 9.75, height = 5.32)
   print(e)
   dev.off()
@@ -293,7 +293,7 @@ yuxi_feedback <- function (path, pid, first) {
   # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig3.pdf",
   #     width = 9.75, height = 5.32)
   
-  pdf(paste(path, "/", id, "/fig3.pdf", sep=""),
+  pdf(paste(path, "/", pid, "/fig3.pdf", sep=""),
        width = 9.75, height = 5.32)
   print(g)
   dev.off()
@@ -360,7 +360,7 @@ yuxi_feedback <- function (path, pid, first) {
   # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig4.pdf",
   #     width = 9.75, height = 5.32)
   
-  pdf(paste(path, "/", id, "/fig4.pdf", sep=""),
+  pdf(paste(path, "/", pid, "/fig4.pdf", sep=""),
        width = 9.75, height = 5.32)
   print(corr)
   dev.off()
