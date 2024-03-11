@@ -1,6 +1,6 @@
 #'@importFrom magrittr "%>%"
 #'@export
-yuxi_sleeplog <- function(path, id, first) {
+yuxi_sleeplog <- function(path, pid, first) {
   
   
   log <- data.frame(matrix(ncol = 1, nrow = 1))
@@ -103,7 +103,7 @@ yuxi_sleeplog <- function(path, id, first) {
       dplyr::select(-c(reportdate_diff, reportdate_diff2))-> log
     
     # output
-    openxlsx::write.xlsx(log, paste(path, "/sleeplog_", id, ".xlsx", sep=""))
+    openxlsx::write.xlsx(log, paste(path, "/sleeplog_", pid, ".xlsx", sep=""))
     
     return('done, please check folder')
     
