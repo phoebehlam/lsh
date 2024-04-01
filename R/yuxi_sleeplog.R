@@ -13,6 +13,9 @@ yuxi_sleeplog <- function(path, id, first) {
   # troubleshoot
   # file <- read.csv("/Users/phoebelam/Desktop/yuxi/Dissertation-Morning Day 1-Updated_March 11, 2024_13.57.csv")
   # 
+  
+  # file<- read.csv('/Users/phoebelam/Desktop/morning/Dissertation-Morning Day 1-Updated_April 1, 2024_12.09.csv')
+  
   # file %>% 
   #   dplyr::filter (EMAIL == 'test1') %>%
   #   dplyr::rename (qid = ExternalReference) %>%
@@ -25,7 +28,6 @@ yuxi_sleeplog <- function(path, id, first) {
     
     print (f)
     
-    
     file<-read.csv(f)
     
     # remind yuxi to not change the name of the survey ever
@@ -34,7 +36,10 @@ yuxi_sleeplog <- function(path, id, first) {
       gsub ("Dissertation-Morning Day |-", " ", .) %>%
       substr(., 1, 3) -> daynum
   
-    
+    # basename('/Users/phoebelam/Desktop/morning/Dissertation-Morning Day 1-Updated_April 1, 2024_12.09.csv') %>%
+    #   gsub ("Dissertation-Morning Day |-", " ", .) %>%
+    #   substr(., 1, 3) -> daynum
+
     
     # grab id - need to tell yuxi about external reference + do not change the name of the ID column after this
     file %>% 
@@ -42,8 +47,7 @@ yuxi_sleeplog <- function(path, id, first) {
       dplyr::mutate(qualtrics_day = daynum) %>%
       dplyr::select (., qualtrics_day, StartDate, EndDate, pid, BedTime.1_1:WakeTime.3_1) %>%
       dplyr::filter (pid == id)-> file
-
-    
+  
     # grab bed time and wake time
     file %>%
       dplyr::mutate(bedtime = paste(paste(BedTime.1_1, BedTime.2_1, sep=":"), BedTime.3_1, sep=" "),
@@ -109,7 +113,7 @@ yuxi_sleeplog <- function(path, id, first) {
       dplyr::select(-c(reportdate_diff, reportdate_diff2))-> log
     
     # output
-    openxlsx::write.xlsx(log, paste(path, "/sleeplog_", pid, ".xlsx", sep=""))
+    openxlsx::write.xlsx(log, paste(path, "/sleeplog_", id, ".xlsx", sep=""))
     
     return('done, please check folder')
     
