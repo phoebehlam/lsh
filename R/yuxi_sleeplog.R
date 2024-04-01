@@ -127,6 +127,6 @@ yuxi_sleeplog <- function(path, id, first) {
   
 # library(dplyr)
 # yuxi_sleeplog(path = '/Users/phoebelam/Desktop/yuxi',
-#               id = 101,
-#               first = '2024-02-20')
+#               id = '032024094100',
+#               first = '2024-03-21')
 
