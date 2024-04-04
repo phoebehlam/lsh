@@ -315,10 +315,10 @@ yuxi_feedback <- function (path, pid, first) {
   
   new %>%
     dplyr::mutate(pss_pomp_10 = pss_pomp/10) -> new
+
   
   
-  
-  sleepcorr <- data.frame(type = c('Sleep duration: \nHours of actual sleep', 
+  sleepcorr <- data.frame(type = c('Sleep duration: \nMinutes of actual sleep', 
                                    'Sleep efficiency: Percent of \ntime sleeping while in bed', 
                                    'Number of minutes \nit took to fall asleep', 
                                    'Number of awakenings'),
@@ -327,14 +327,14 @@ yuxi_feedback <- function (path, pid, first) {
                                    lm(latency~pss_pomp_10, data = new)$coefficients[2],
                                    lm(Number.of.Awakenings~pss_pomp_10, data = new)$coefficients[2])) %>%
     dplyr::mutate(sign = as.character(sign(coef)),
-           label = dplyr::case_when(sign == -1 & type == 'Sleep duration: \nHours of actual sleep'~ paste('Decreases by ', abs(round(coef, 1)), ' hours', sep=""),
-                             sign == 1 & type == 'Sleep duration: \nHours of actual sleep'~ paste('Increases by ', abs(round(coef, 1)), ' hours', sep=""),
-                             sign == -1 & type == 'Sleep efficiency: Percent of \ntime sleeping while in bed'~ paste('Decreases by ', abs(round(coef, 2)), '%', sep=""),
-                             sign == 1 & type == 'Sleep efficiency: Percent of \ntime sleeping while in bed'~ paste('Increases by ', abs(round(coef, 2)), '%', sep=""),
-                             sign == -1 & type == 'Number of minutes \nit took to fall asleep'~ paste('Decreases by ', abs(round(coef, 1)), ' minutes', sep=""),
-                             sign == 1 & type == 'Number of minutes \nit took to fall asleep'~ paste('Increases by ', abs(round(coef, 1)), ' minutes', sep=""),
-                             sign == -1 & type == 'Number of awakenings'~ paste('Decreases by ', abs(round(coef, 1)), ' times', sep=""),
-                             sign == 1 & type == 'Number of awakenings'~ paste('Increases by ', abs(round(coef, 1)), ' times', sep=""))) %>%
+           label = dplyr::case_when(sign == -1 & type == 'Sleep duration: \nMinutes of actual sleep'~ paste('Decreases by\n', abs(round(coef, 1)), ' minutes', sep=""),
+                             sign == 1 & type == 'Sleep duration: \nMinutes of actual sleep'~ paste('Increases by\n', abs(round(coef, 1)), ' minutes', sep=""),
+                             sign == -1 & type == 'Sleep efficiency: Percent of \ntime sleeping while in bed'~ paste('Decreases by\n', abs(round(coef, 2)), '%', sep=""),
+                             sign == 1 & type == 'Sleep efficiency: Percent of \ntime sleeping while in bed'~ paste('Increases by\n', abs(round(coef, 2)), '%', sep=""),
+                             sign == -1 & type == 'Number of minutes \nit took to fall asleep'~ paste('Decreases by\n', abs(round(coef, 1)), ' minutes', sep=""),
+                             sign == 1 & type == 'Number of minutes \nit took to fall asleep'~ paste('Increases by\n', abs(round(coef, 1)), ' minutes', sep=""),
+                             sign == -1 & type == 'Number of awakenings'~ paste('Decreases by\n', abs(round(coef, 1)), ' times', sep=""),
+                             sign == 1 & type == 'Number of awakenings'~ paste('Increases by\n', abs(round(coef, 1)), ' times', sep=""))) %>%
     dplyr::mutate(label_pos = dplyr::case_when(sign == 1~ label),
            label_neg = dplyr::case_when(sign == -1~ label))
   
@@ -345,10 +345,9 @@ yuxi_feedback <- function (path, pid, first) {
     ggplot2::xlab("") +
     ggplot2::ggtitle("For every 10% increase in perceived stress...") +
     ggplot2::ylab("") +
+    ggplot2::ylim(min(sleepcorr$coef, na.rm=T)-40, max(sleepcorr$coef, na.rm=T)+40) +
     ggplot2::coord_flip() +
-    ggplot2::theme_minimal() +
-    ggplot2::ylim(min(sleepcorr$coef, na.rm=T)-3, max(sleepcorr$coef, na.rm=T)+3) +
-    ggplot2::scale_fill_manual(values=c("#e8a093", 
+    ggplot2::theme_minimal() +    ggplot2::scale_fill_manual(values=c("#e8a093", 
                                "#637A9F")) +
     ggplot2::theme(legend.position = "none",
           axis.text.x=element_blank(), 
@@ -362,7 +361,7 @@ yuxi_feedback <- function (path, pid, first) {
       fill = "white", label.size = 0) +
     ggplot2::geom_label(
       aes(label = label_pos), 
-      hjust = -sleepcorr$coef[2],
+      hjust = -.1,
       size = 4, fontface = "bold",
       fill = "white", label.size = 0) -> corr
   
