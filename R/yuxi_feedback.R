@@ -7,7 +7,7 @@ yuxi_feedback <- function (path, pid, first) {
   
   dat <- read.csv(filenames, header = T)
   
-  # dat <- read.csv('/Users/phoebelam/Desktop/yuxi/Yuxi_0205coded_Yuxi.csv', header = T)
+  #dat <- read.csv('/Users/phoebelam/Desktop/yuxi/Yuxi_0205coded_Yuxi.csv', header = T)
   #dat <- read.csv('/Users/yuxixie/Downloads/yuxi_feedback form/Yuxi_0205coded_Yuxi.csv', header = T)
   
   dat %>% 
@@ -214,6 +214,10 @@ yuxi_feedback <- function (path, pid, first) {
   
   # file <- read.csv("/Users/phoebelam/Desktop/yuxi/Dissertation-Night Day 1_March 2, 2024_22.27.csv" )
   
+  # file <- read.csv('/Users/phoebelam/Desktop/yuxi/Dissertation-Night Day 1-Updated_April 3, 2024_12.20.csv')
+  # file <- read.csv('/Users/phoebelam/Desktop/yuxi/Dissertation-Night Day 2-Updated_April 3, 2024_13.08.csv')
+  
+  
   # loop
   for (f in filenames) {
     
@@ -225,6 +229,10 @@ yuxi_feedback <- function (path, pid, first) {
     basename(f) %>%
       gsub ("Dissertation-Night Day |_", " ", .) %>%
       substr(., 1, 3) -> daynum
+    
+    # basename('/Users/phoebelam/Desktop/yuxi/Dissertation-Night Day 2-Updated_April 3, 2024_13.08.csv') %>%
+    #   gsub ("Dissertation-Night Day |_", " ", .) %>%
+    #   substr(., 1, 3) -> daynum
     
     # grab id - need to tell yuxi about external reference + do not change the name of the ID column after this
     file %>% 
@@ -256,8 +264,9 @@ yuxi_feedback <- function (path, pid, first) {
     
   }
   
+  
   log <- readRDS (paste(path, "/night.rds", sep="")) [-1,-1] %>%
-    dplyr::mutate(qualtrics_day = as.numeric(qualtrics_day)) %>% arrange(qualtrics_day)
+    dplyr::mutate(qualtrics_day = as.numeric( gsub('-', '', qualtrics_day, ignore.case = T))) %>% arrange(qualtrics_day)
   
   # use of "should" date instead of actual report date in case of late entries
   should <- c(as.Date(first), as.Date(first)+1, as.Date(first)+2, as.Date(first)+3, as.Date(first)+4, as.Date(first)+5, 
