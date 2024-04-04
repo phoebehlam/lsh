@@ -336,7 +336,7 @@ yuxi_feedback <- function (path, pid, first) {
                              sign == -1 & type == 'Number of awakenings'~ paste('Decreases by\n', abs(round(coef, 1)), ' times', sep=""),
                              sign == 1 & type == 'Number of awakenings'~ paste('Increases by\n', abs(round(coef, 1)), ' times', sep=""))) %>%
     dplyr::mutate(label_pos = dplyr::case_when(sign == 1~ label),
-           label_neg = dplyr::case_when(sign == -1~ label))
+                  label_neg = dplyr::case_when(sign == -1~ label))
   
   
   
