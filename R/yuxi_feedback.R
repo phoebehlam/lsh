@@ -88,9 +88,10 @@ yuxi_feedback <- function (path, pid, first) {
     ggplot2::theme_minimal() + 
     ggplot2::ggtitle("Sleep duration: Hours of actual sleep") +
     ggplot2::ylab('') +
-    ggplot2::ylim(min(dat$duration)-5, max(dat$duration)+5) +
+    ggplot2::ylim(min(dat$duration, na.rm=T)-1, max(dat$duration, na.rm=T)+1) +
     ggplot2::scale_x_date("", date_breaks = "days" , date_labels = "%b-%d")+
     theme(plot.title=element_text(face="bold", size = 15)) -> a
+  
   
   # sleep efficiency
   dat %>% 
@@ -101,7 +102,7 @@ yuxi_feedback <- function (path, pid, first) {
     ggplot2::theme_minimal() + 
     ggplot2::ggtitle("Sleep efficiency: Percent of time sleeping while in bed") +
     ggplot2::ylab('') +
-    ggplot2::ylim(min(dat$sleepeff)-3, 105) +
+    ggplot2::ylim(min(dat$sleepeff, na.rm=T)-3, 105) +
     ggplot2::scale_x_date("", date_breaks = "days" , date_labels = "%b-%d")+
     ggplot2::theme(plot.title=element_text(face="bold", size = 15)) -> b
   
@@ -114,7 +115,7 @@ yuxi_feedback <- function (path, pid, first) {
     ggplot2::theme_minimal() + 
     ggplot2::ggtitle("Number of minutes it took to fall asleep") +
     ggplot2::ylab('') +
-    ggplot2::ylim(min(dat$latency)-5, max(dat$latency)+5)+
+    ggplot2::ylim(min(dat$latency, na.rm=T)-3, max(dat$latency, na.rm=T)+3)+
     ggplot2::scale_x_date("", date_breaks = "days" , date_labels = "%b-%d")+
     ggplot2::theme(plot.title=element_text(face="bold", size = 15)) -> c
   
@@ -140,7 +141,7 @@ yuxi_feedback <- function (path, pid, first) {
     ggplot2::ggtitle("Number of awakenings") +
     ggplot2::xlab('') +
     ggplot2::ylab('') +
-    ggplot2::ylim(min(dat$Number.of.Awakenings)-5, max(dat$Number.of.Awakenings)+5) +
+    ggplot2::ylim(min(dat$Number.of.Awakenings, na.rm=T)-3, max(dat$Number.of.Awakenings, na.rm=T)+3) +
     ggplot2::scale_x_date("\nIn-Bed Date", date_breaks = "days" , date_labels = "%b-%d") +
     ggplot2::theme(plot.title=element_text(face="bold", size = 15))-> d
   
@@ -187,7 +188,7 @@ yuxi_feedback <- function (path, pid, first) {
                    axis.ticks.y=element_blank()) +
     ggplot2::labs(y = "") + 
     ggplot2::scale_y_reverse() +
-    ggplot2::ylim(min(long$time_r2)-4000, max(long$time_r2)+4000)-> e
+    ggplot2::ylim(min(long$time_r2, na.rm=T)-4000, max(long$time_r2, na.rm=T)+4000)-> e
   
   # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig2.pdf",
   #     width = 9.75, height = 5.32)
@@ -293,7 +294,7 @@ yuxi_feedback <- function (path, pid, first) {
     ggplot2::ylim(0, 110) +
     ggplot2::scale_x_date("\nIn-Bed Date", date_breaks = "days" , date_labels = "%b-%d") +
     ggplot2::geom_hline(yintercept=mean(log$pss_pomp), linetype="dashed", color = "#637A9F", size = .8) +
-    ggplot2::xlim(min(log$shoulddate), max(log$shoulddate)+.1) +
+    ggplot2::xlim(min(log$shoulddate, na.rm=T), max(log$shoulddate, na.rm=T)+.1) +
     ggplot2::annotate("text", x= log$shoulddate[nrow(log)]-0.3, y = mean(log$pss_pomp)-3,
              label = paste("Your average"), color = '#637A9F', size = 4, fontface = 'bold') +
     ggplot2::theme(plot.title=element_text(face="bold", size = 15)) ->g
