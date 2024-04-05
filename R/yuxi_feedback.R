@@ -88,7 +88,7 @@ yuxi_feedback <- function (path, pid, first) {
     ggplot2::theme_minimal() + 
     ggplot2::ggtitle("Sleep duration: Hours of actual sleep") +
     ggplot2::ylab('') +
-    ggplot2::ylim(min(dat$duration)-1, max(dat$duration)+1) +
+    ggplot2::ylim(min(dat$duration)-5, max(dat$duration)+5) +
     ggplot2::scale_x_date("", date_breaks = "days" , date_labels = "%b-%d")+
     theme(plot.title=element_text(face="bold", size = 15)) -> a
   
@@ -114,7 +114,7 @@ yuxi_feedback <- function (path, pid, first) {
     ggplot2::theme_minimal() + 
     ggplot2::ggtitle("Number of minutes it took to fall asleep") +
     ggplot2::ylab('') +
-    ggplot2::ylim(min(dat$latency)-3, max(dat$latency)+3)+
+    ggplot2::ylim(min(dat$latency)-5, max(dat$latency)+5)+
     ggplot2::scale_x_date("", date_breaks = "days" , date_labels = "%b-%d")+
     ggplot2::theme(plot.title=element_text(face="bold", size = 15)) -> c
   
@@ -140,7 +140,7 @@ yuxi_feedback <- function (path, pid, first) {
     ggplot2::ggtitle("Number of awakenings") +
     ggplot2::xlab('') +
     ggplot2::ylab('') +
-    ggplot2::ylim(min(dat$Number.of.Awakenings)-3, max(dat$Number.of.Awakenings)+3) +
+    ggplot2::ylim(min(dat$Number.of.Awakenings)-5, max(dat$Number.of.Awakenings)+5) +
     ggplot2::scale_x_date("\nIn-Bed Date", date_breaks = "days" , date_labels = "%b-%d") +
     ggplot2::theme(plot.title=element_text(face="bold", size = 15))-> d
   
