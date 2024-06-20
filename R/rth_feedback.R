@@ -488,12 +488,12 @@ rth_feedback <- function (path, pid, first) {
   
 }
 
-library(formattable)
-library(htmltools)
-library(webshot)
-rth_feedback(path = '/Users/phoebelam/Desktop/rth',
-              pid = 571422,
-              first = '2024-05-06')
+# library(formattable)
+# library(htmltools)
+# library(webshot)
+# rth_feedback(path = '/Users/phoebelam/Desktop/rth',
+#               pid = 571422,
+#               first = '2024-05-06')
 
 
 
