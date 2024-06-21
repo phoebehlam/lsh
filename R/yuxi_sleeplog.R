@@ -10,18 +10,7 @@ yuxi_sleeplog <- function(path, id, first) {
   filenames = intersect(list.files(path = path, full.names = T, recursive = F), 
                         list.files(path = path, pattern = ".csv", full.names = T, recursive = F))
   
-  # troubleshoot
-  # file <- read.csv("/Users/phoebelam/Desktop/yuxi/Dissertation-Morning Day 1-Updated_March 11, 2024_13.57.csv")
-  # 
-  
-  # file<- read.csv('/Users/phoebelam/Desktop/morning/Dissertation-Morning Day 1-Updated_April 1, 2024_12.09.csv')
-  
-  # file %>% 
-  #   dplyr::filter (EMAIL == 'test1') %>%
-  #   dplyr::rename (qid = ExternalReference) %>%
-  #   dplyr::mutate(qualtrics_day = daynum) %>%
-  #   dplyr::select (., qualtrics_day, StartDate, EndDate, qid, BedTime.1_1:WakeTime.3_1) -> file
-
+  # file<- read.csv( "/Users/phoebelam/Desktop/yuxi/Dissertation-Morning Day 1-Updated_March 11, 2024_13.57.csv" )
   
   # loop
   for (f in filenames) {
@@ -36,7 +25,7 @@ yuxi_sleeplog <- function(path, id, first) {
       gsub ("Dissertation-Morning Day |-", " ", .) %>%
       substr(., 1, 3) -> daynum
   
-    # basename('/Users/phoebelam/Desktop/morning/Dissertation-Morning Day 1-Updated_April 1, 2024_12.09.csv') %>%
+    # basename( "/Users/phoebelam/Desktop/yuxi/Dissertation-Morning Day 1-Updated_March 11, 2024_13.57.csv" ) %>%
     #   gsub ("Dissertation-Morning Day |-", " ", .) %>%
     #   substr(., 1, 3) -> daynum
 
@@ -53,14 +42,14 @@ yuxi_sleeplog <- function(path, id, first) {
       dplyr::mutate(bedtime = paste(paste(BedTime.1_1, BedTime.2_1, sep=":"), BedTime.3_1, sep=" "),
              waketime = paste(paste(WakeTime.1_1, WakeTime.2_1, sep=":"), WakeTime.3_1, sep=" ")) -> file
   
-    # grab reference date (remind yuxi this is only correct if no binged)
+
     # remind yuxi do not open the .csv from the zip
     file %>% tidyr::separate (EndDate, c("eDate", "eTime"), " ", fill = "right", remove= FALSE) %>%
       dplyr::mutate(date = as.Date(eDate, "%Y-%m-%d")-1) %>%
       dplyr::rename(reportdate = eDate) -> file
     
     # trim
-    file %>% dplyr::select(., pid, qualtrics_day, date, bedtime, waketime, reportdate) -> file
+    file %>% dplyr::select(., pid, qualtrics_day, date, bedtime, waketime, reportdate, EndDate) -> file
     
     # consolidate
     log <- readRDS (paste(path, "/sleeplog.rds", sep=""))
@@ -71,6 +60,10 @@ yuxi_sleeplog <- function(path, id, first) {
   }
   
   log <- readRDS (paste(path, "/sleeplog.rds", sep="")) [-1,-1]
+  
+  log %>%
+    mutate(qualtrics_day = as.numeric(qualtrics_day)) %>%
+    arrange(qualtrics_day) -> log
   
   if (nrow (log) > 0) {
     
@@ -86,20 +79,22 @@ yuxi_sleeplog <- function(path, id, first) {
     log %>% dplyr::mutate(qualtrics_day = as.numeric(qualtrics_day)) -> log
     merge(log, should, by = 'qualtrics_day', all=T) -> log
     
-
     log %>%
       dplyr::mutate_at(dplyr::vars(shoulddate, reportdate),
                        list(~as.Date(.))) %>% 
       dplyr::mutate(compliance = dplyr::case_when(shoulddate-reportdate==0~ 'ok',
-                                           shoulddate-reportdate>0~ 'late',
-                                           is.na(shoulddate-reportdate)==T~ 'missing')) -> log
+                                                  reportdate-shoulddate == 1 & grepl('am', bedtime)==T~ 'ok',
+                                                  reportdate-shoulddate == 1 & grepl('pm', bedtime)==T~ 'maybe late',
+                                                  reportdate-shoulddate > 1 ~ 'definitely late',
+                                                  is.na(reportdate)==T~ 'missing')) -> log
     
     #binging alert
-    #binge defined by two entries indexing the same sleep date
+    # binge defined by two entries done within 2 hours
     log %>%
-      dplyr::mutate(reportdate_diff = reportdate - dplyr::lag(reportdate),
-                    reportdate_diff2 = reportdate - dplyr::lead(reportdate)) %>%
-      dplyr::mutate(binge = dplyr::case_when(reportdate_diff == 0 | reportdate_diff2 == 0~ 'binge',
+      dplyr::mutate(EndDate = as.POSIXct(log$EndDate),
+                    reportdate_diff = abs(as.numeric(difftime(EndDate, dplyr::lag(EndDate), units = 'mins'))),
+                    reportdate_diff2 = abs(as.numeric(difftime(EndDate, dplyr::lead(EndDate), units = 'mins')))) %>% 
+      dplyr::mutate(binge = dplyr::case_when(reportdate_diff < 120 | reportdate_diff2 < 120~ 'likely binge',
                                              is.na(reportdate_diff)==T & is.na(reportdate_diff2)==T~ NA_character_,
                                              TRUE~ 'ok')) -> log
     
@@ -110,7 +105,7 @@ yuxi_sleeplog <- function(path, id, first) {
              `alleged sleep date` = date,
              `date reported sleep` = reportdate,
              `date should have reported sleep`= shoulddate) %>%
-      dplyr::select(-c(reportdate_diff, reportdate_diff2))-> log
+      dplyr::select(-c(reportdate_diff, reportdate_diff2, EndDate))-> log
     
     # output
     openxlsx::write.xlsx(log, paste(path, "/sleeplog_", id, ".xlsx", sep=""))
@@ -127,6 +122,6 @@ yuxi_sleeplog <- function(path, id, first) {
   
 # library(dplyr)
 # yuxi_sleeplog(path = '/Users/phoebelam/Desktop/yuxi',
-#               id = '032024094100',
+#               id = '30624114831',
 #               first = '2024-03-21')
 

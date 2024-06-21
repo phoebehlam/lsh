@@ -320,6 +320,11 @@ rth_feedback <- function (path, pid, first) {
     ggplot2::ylim(min(log$stressor_sum, na.rm=T)-2, max(log$stressor_sum, na.rm=T)+2) +
     ggplot2::scale_x_date("\nDate", date_breaks = "days" , date_labels = "%b-%d") +
     ggplot2::theme(plot.title=ggplot2::element_text(face="bold", size = 15)) -> g
+  
+  pdf(paste(path, "/", pid, "/fig3.pdf", sep=""),
+      width = 9.75, height = 5.32)
+  print(corr)
+  dev.off()
 
   
   # positive and negative emotions 
@@ -361,9 +366,9 @@ rth_feedback <- function (path, pid, first) {
     ggplot2::theme(plot.title=ggplot2::element_text(face="bold", size = 15)) ->i
   
   
-  pdf(paste(path, "/", pid, "/fig3.pdf", sep=""),
+  pdf(paste(path, "/", pid, "/fig4.pdf", sep=""),
       width = 9.75, height = 10.64)
-  print(ggpubr::ggarrange(g, h, i, ncol=1))
+  print(ggpubr::ggarrange(h, i, ncol=1))
   dev.off()
   
   #stress and sleep merge
@@ -423,7 +428,7 @@ rth_feedback <- function (path, pid, first) {
       size = 4, fontface = "bold",
       fill = "white", label.size = 0) -> corr
   
-  pdf(paste(path, "/", pid, "/fig5.pdf", sep=""),
+  pdf(paste(path, "/", pid, "/fig6.pdf", sep=""),
       width = 9.75, height = 5.32)
   print(corr)
   dev.off()
@@ -478,7 +483,7 @@ rth_feedback <- function (path, pid, first) {
       fill = "white", label.size = 0) -> corr2
   
   
-  pdf(paste(path, "/", pid, "/fig4.pdf", sep=""),
+  pdf(paste(path, "/", pid, "/fig5.pdf", sep=""),
       width = 9.75, height = 5.32)
   print(corr2)
   dev.off()
