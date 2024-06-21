@@ -389,14 +389,14 @@ rth_feedback <- function (path, pid, first) {
                                    lm(latency~negemo_pomp_10, data = new)$coefficients[2],
                                    lm(Number.of.Awakenings~negemo_pomp_10, data = new)$coefficients[2])) %>%
     dplyr::mutate(sign = as.character(sign(coef)),
-           label = dplyr::case_when(sign == -1 & type == 'Sleep duration:\nMinutes of actual sleep'~ paste('Decreases by\n', abs(round(coef, 1)), ' minutes', sep=""),
-                             sign == 1 & type == 'Sleep duration:\nMinutes of actual sleep'~ paste('Increases by\n', abs(round(coef, 1)), ' minutes', sep=""),
-                             sign == -1 & type == 'Sleep efficiency: Percent of\ntime sleeping while in bed'~ paste('Decreases by\n', abs(round(coef, 2)), '%', sep=""),
-                             sign == 1 & type == 'Sleep efficiency: Percent of\ntime sleeping while in bed'~ paste('Increases by\n', abs(round(coef, 2)), '%', sep=""),
-                             sign == -1 & type == 'Number of minutes\nit took to fall asleep'~ paste('Decreases by\n', abs(round(coef, 1)), ' minutes', sep=""),
-                             sign == 1 & type == 'Number of minutes\nit took to fall asleep'~ paste('Increases by\n', abs(round(coef, 1)), ' minutes', sep=""),
-                             sign == -1 & type == 'Number of awakenings'~ paste('Decreases by\n', abs(round(coef, 1)), ' times', sep=""),
-                             sign == 1 & type == 'Number of awakenings'~ paste('Increases by\n', abs(round(coef, 1)), ' times', sep=""))) %>%
+           label = dplyr::case_when(sign == -1 & type == 'Sleep duration:\nMinutes of actual sleep'~ paste('Decreased by\n', abs(round(coef, 1)), ' minutes', sep=""),
+                             sign == 1 & type == 'Sleep duration:\nMinutes of actual sleep'~ paste('Increased by\n', abs(round(coef, 1)), ' minutes', sep=""),
+                             sign == -1 & type == 'Sleep efficiency: Percent of\ntime sleeping while in bed'~ paste('Decreased by\n', abs(round(coef, 2)), '%', sep=""),
+                             sign == 1 & type == 'Sleep efficiency: Percent of\ntime sleeping while in bed'~ paste('Increased by\n', abs(round(coef, 2)), '%', sep=""),
+                             sign == -1 & type == 'Number of minutes\nit took to fall asleep'~ paste('Decreased by\n', abs(round(coef, 1)), ' minutes', sep=""),
+                             sign == 1 & type == 'Number of minutes\nit took to fall asleep'~ paste('Increased by\n', abs(round(coef, 1)), ' minutes', sep=""),
+                             sign == -1 & type == 'Number of awakenings'~ paste('Decreased by\n', abs(round(coef, 1)), ' times', sep=""),
+                             sign == 1 & type == 'Number of awakenings'~ paste('Increased by\n', abs(round(coef, 1)), ' times', sep=""))) %>%
     dplyr::mutate(label_pos = dplyr::case_when(sign == 1~ label),
                   label_neg = dplyr::case_when(sign == -1~ label))
   
@@ -443,14 +443,14 @@ rth_feedback <- function (path, pid, first) {
                                    lm(latency~stressor_dc, data = new)$coefficients[2],
                                    lm(Number.of.Awakenings~stressor_dc, data = new)$coefficients[2])) %>%
     dplyr::mutate(sign = as.character(sign(coef)),
-                  label = dplyr::case_when(sign == -1 & type == 'Sleep duration:\nMinutes of actual sleep'~ paste('Decreases by\n', abs(round(coef, 1)), ' minutes', sep=""),
-                                           sign == 1 & type == 'Sleep duration:\nMinutes of actual sleep'~ paste('Increases by\n', abs(round(coef, 1)), ' minutes', sep=""),
-                                           sign == -1 & type == 'Sleep efficiency: Percent of\ntime sleeping while in bed'~ paste('Decreases by\n', abs(round(coef, 2)), '%', sep=""),
-                                           sign == 1 & type == 'Sleep efficiency: Percent of\ntime sleeping while in bed'~ paste('Increases by\n', abs(round(coef, 2)), '%', sep=""),
-                                           sign == -1 & type == 'Number of minutes\nit took to fall asleep'~ paste('Decreases by\n', abs(round(coef, 1)), ' minutes', sep=""),
-                                           sign == 1 & type == 'Number of minutes\nit took to fall asleep'~ paste('Increases by\n', abs(round(coef, 1)), ' minutes', sep=""),
-                                           sign == -1 & type == 'Number of awakenings'~ paste('Decreases by\n', abs(round(coef, 1)), ' times', sep=""),
-                                           sign == 1 & type == 'Number of awakenings'~ paste('Increases by\n', abs(round(coef, 1)), ' times', sep=""))) %>%
+                  label = dplyr::case_when(sign == -1 & type == 'Sleep duration:\nMinutes of actual sleep'~ paste('Decreased by\n', abs(round(coef, 1)), ' minutes', sep=""),
+                                           sign == 1 & type == 'Sleep duration:\nMinutes of actual sleep'~ paste('Increased by\n', abs(round(coef, 1)), ' minutes', sep=""),
+                                           sign == -1 & type == 'Sleep efficiency: Percent of\ntime sleeping while in bed'~ paste('Decreased by\n', abs(round(coef, 2)), '%', sep=""),
+                                           sign == 1 & type == 'Sleep efficiency: Percent of\ntime sleeping while in bed'~ paste('Increased by\n', abs(round(coef, 2)), '%', sep=""),
+                                           sign == -1 & type == 'Number of minutes\nit took to fall asleep'~ paste('Decreased by\n', abs(round(coef, 1)), ' minutes', sep=""),
+                                           sign == 1 & type == 'Number of minutes\nit took to fall asleep'~ paste('Increased by\n', abs(round(coef, 1)), ' minutes', sep=""),
+                                           sign == -1 & type == 'Number of awakenings'~ paste('Decreased by\n', abs(round(coef, 1)), ' times', sep=""),
+                                           sign == 1 & type == 'Number of awakenings'~ paste('Increased by\n', abs(round(coef, 1)), ' times', sep=""))) %>%
     dplyr::mutate(label_pos = dplyr::case_when(sign == 1~ label),
                   label_neg = dplyr::case_when(sign == -1~ label))
   
