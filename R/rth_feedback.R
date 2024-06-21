@@ -323,7 +323,7 @@ rth_feedback <- function (path, pid, first) {
   
   pdf(paste(path, "/", pid, "/fig3.pdf", sep=""),
       width = 9.75, height = 5.32)
-  print(corr)
+  print(g)
   dev.off()
 
   
