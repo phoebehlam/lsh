@@ -126,5 +126,5 @@ rth_sleeplog <- function(path, pid, first) {
 # library(dplyr)
 # rth_sleeplog(path = '/Users/phoebelam/Desktop/rth',
 #               pid = 777544,
-#               first = '2024-05-05')
+#               first = '2024-05-06')
 
