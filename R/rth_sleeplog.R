@@ -9,7 +9,7 @@ rth_sleeplog <- function(path, pid, first) {
   filenames = intersect(list.files(path = path, full.names = T, recursive = F), 
                         list.files(path = path, pattern = ".csv", full.names = T, recursive = F))
   
-  # file <- read.csv("/Users/phoebelam/Desktop/rth/RTH_ya_daily_1_June+20,+2024_17.05.csv")
+  # file <- read.csv("/Users/phoebelam/Desktop/rth/RTH_ya_daily_12_June+20,+2024_17.17.csv")
   
   # loop
   for (f in filenames) {
@@ -23,7 +23,7 @@ rth_sleeplog <- function(path, pid, first) {
       substr(., 1, 2) %>%
       gsub("_", "", .)-> daynum
     
-    # basename("/Users/phoebelam/Desktop/rth/RTH_ya_daily_1_June+20,+2024_17.05.csv") %>%
+    # basename("/Users/phoebelam/Desktop/rth/RTH_ya_daily_12_June+20,+2024_17.17.csv") %>%
     #   gsub ("RTH_ya_daily_", "", .) %>%
     #   substr(., 1, 2) %>%
     #   gsub("_", "", .)-> daynum
@@ -88,6 +88,7 @@ rth_sleeplog <- function(path, pid, first) {
       dplyr::mutate(compliance = dplyr::case_when(shoulddate-reportdate==0~ 'ok',
                                                   reportdate-shoulddate == 1 & grepl('am', bedtime)==T~ 'ok',
                                                   reportdate-shoulddate == 1 & grepl('pm', bedtime)==T~ 'maybe late',
+                                                  reportdate-shoulddate > 1 ~ 'definitely late',
                                                   is.na(reportdate)==T~ 'missing')) -> log
     
     # binging alert
