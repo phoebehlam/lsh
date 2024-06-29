@@ -40,8 +40,11 @@ yuxi_sleeplog <- function(path, id, first) {
   
     # grab bed time and wake time
     file %>%
-      dplyr::mutate(bedtime = paste(paste(BedTime.1_1, BedTime.2_1, sep=":"), BedTime.3_1, sep=" "),
-             waketime = paste(paste(WakeTime.1_1, WakeTime.2_1, sep=":"), WakeTime.3_1, sep=" ")) -> file
+      dplyr::mutate_at(vars(BedTime.3_1, WakeTime.3_1),
+                       list(ampm = ~case_when(. == 1~ 'am',
+                                              . == 2~ 'pm'))) %>%
+      dplyr::mutate(bedtime = paste(paste(BedTime.1_1, BedTime.2_1, sep=":"), BedTime.3_1_ampm, sep=" "),
+             waketime = paste(paste(WakeTime.1_1, WakeTime.2_1, sep=":"), WakeTime.3_1_ampm, sep=" ")) -> file
   
 
     # remind yuxi do not open the .csv from the zip
