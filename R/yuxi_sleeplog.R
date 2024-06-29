@@ -10,7 +10,9 @@ yuxi_sleeplog <- function(path, id, first) {
   filenames = intersect(list.files(path = path, full.names = T, recursive = F), 
                         list.files(path = path, pattern = ".csv", full.names = T, recursive = F))
   
-  # file<- read.csv( "/Users/phoebelam/Desktop/yuxi/Dissertation-Morning Day 1-Updated_March 11, 2024_13.57.csv" )
+
+  # file <- read.csv("/Users/phoebelam/Desktop/yuxi/Dissertation-Morning Day 1-Updated_June 28, 2024_06.20.csv")
+  
   
   # loop
   for (f in filenames) {
@@ -21,14 +23,13 @@ yuxi_sleeplog <- function(path, id, first) {
     
     # remind yuxi to not change the name of the survey ever
     
+    # basename("/Users/phoebelam/Desktop/yuxi/Dissertation-Morning Day 1-Updated_June 28, 2024_06.20.csv") %>%
+    #   gsub ("Dissertation-Morning Day |-", " ", .) %>%
+    #   substr(., 1, 3) -> daynum
+    
     basename(f) %>%
       gsub ("Dissertation-Morning Day |-", " ", .) %>%
       substr(., 1, 3) -> daynum
-  
-    # basename( "/Users/phoebelam/Desktop/yuxi/Dissertation-Morning Day 1-Updated_March 11, 2024_13.57.csv" ) %>%
-    #   gsub ("Dissertation-Morning Day |-", " ", .) %>%
-    #   substr(., 1, 3) -> daynum
-
     
     # grab id - need to tell yuxi about external reference + do not change the name of the ID column after this
     file %>% 
@@ -51,12 +52,12 @@ yuxi_sleeplog <- function(path, id, first) {
     # trim
     file %>% dplyr::select(., pid, qualtrics_day, date, bedtime, waketime, reportdate, EndDate) -> file
     
+   
     # consolidate
     log <- readRDS (paste(path, "/sleeplog.rds", sep=""))
     log <- suppressWarnings(gtools::smartbind (log, file))
     saveRDS (log, paste(path, "/sleeplog.rds", sep=""))
-    
-    
+
   }
   
   log <- readRDS (paste(path, "/sleeplog.rds", sep="")) [-1,-1]
