@@ -7,8 +7,7 @@ yuxi_feedback <- function (path, pid, first) {
   
   dat <- read.csv(filenames, header = T)
   
-  #dat <- read.csv('/Users/phoebelam/Desktop/yuxi/Yuxi_0205coded_Yuxi.csv', header = T)
-  #dat <- read.csv('/Users/yuxixie/Downloads/yuxi_feedback form/Yuxi_0205coded_Yuxi.csv', header = T)
+  # dat <- read.csv('/Users/phoebelam/Desktop/yuxi/032024094100_coded_scored sleep.csv', header = T)
   
   dat %>% 
     dplyr::mutate(sleepeff = round(Sleep.Percent.Onset.to.Offset, 1),
@@ -17,6 +16,7 @@ yuxi_feedback <- function (path, pid, first) {
                                      TRUE~ as.Date(Start.Date, "%m/%d/%Y")),
            awakening = round(Mean.Awakening..mins.*Number.of.Awakenings, 2),
            duration = round(Sleep.Time..mins./60, 1)) -> dat
+  
   
   # summary table
   dat %>%
@@ -42,46 +42,42 @@ yuxi_feedback <- function (path, pid, first) {
     dplyr::rename(`Average across days` = mean,
            `Minimum value across days` = min,
            `Maximum value across days` = max)-> summary
-  
+
   formattable(summary, 
               align ="l", 
               list(`Sleep characteristics` = formatter(
-                "span", style = ~ style(color = "grey",font.weight = "bold")) 
+                "span", 
+                style = ~ style(color = "black",font.weight = "bold", width = '500px')) 
               )) -> table
   
-  export_formattable <- function(f, file, width = "60%", height = NULL, 
-                                 background = "white", delay = 0.2)
-  {
+  
+  export_formattable <- function(f, file, 
+                                 width = "600px", height = NULL, 
+                                 background = "white", delay = 0.2) {
     w <- as.htmlwidget(f, width = width, height = height)
     path <- html_print(w, background = background, viewer = NULL)
     url <- paste0("file:///", gsub("\\\\", "/", normalizePath(path)))
     webshot(url,
-            file = file,
-            selector = ".formattable_widget",
-            delay = delay)
+                      file = file,
+                      selector = ".formattable_widget",
+                      delay = delay, 
+                      vwidth = 3200,  
+                      vheight = 6864,  
+                      zoom = 5)  
   }
   
-  
-  if (file.exists(paste(path, "/", pid, sep=""))){
-    
-    export_formattable(table, paste(path, "/", pid, "/table.pdf", sep=""))
-    
+  if (file.exists(paste(path, "/", pid, sep = ""))) {
+    export_formattable(table, paste(path, "/", pid, "/table.png", sep = ""))
   } else {
-    
-    dir.create(paste(path, "/", pid, sep=""))
-    export_formattable(table, paste(path, "/", pid, "/table.pdf", sep=""))
-    
+    dir.create(paste(path, "/", pid, sep = ""))
+    export_formattable(table, paste(path, "/", pid, "/table.png", sep = ""))
   }
   
-  
-  
-  
-  # export_formattable(table,"/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/table.pdf")
   
   # figures
   # sleep duration
   dat %>% 
-    ggplot2::ggplot( aes(x=startdate_adj, y=duration)) +
+    ggplot2::ggplot(aes(x=startdate_adj, y=duration)) +
     ggplot2::geom_line(color="#A9A9A9", aes(group=1), linewidth = 1) +
     ggplot2::geom_point(shape=21, color="#637A9F", fill="#637A9F", size=3, alpha=.8) +
     ggplot2::geom_text(aes(label = duration), hjust=0.5, vjust=-1, size = 4) +
@@ -145,11 +141,8 @@ yuxi_feedback <- function (path, pid, first) {
     ggplot2::scale_x_date("\nIn-Bed Date", date_breaks = "days" , date_labels = "%b-%d") +
     ggplot2::theme(plot.title=element_text(face="bold", size = 15))-> d
   
-  # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig1.pdf",
-  #     width = 9.75, height = 10.64)
-  
-  pdf(paste(path, "/", pid, "/fig1.pdf", sep=""),
-      width = 9.75, height = 10.64)
+  png(paste(path, "/", pid, "/fig1.png", sep=""),
+      width = 9.75, height = 10.64, units = "in", res = 300)
   print(ggpubr::ggarrange(a, b, c, d, ncol=1))
   dev.off()
   
@@ -190,11 +183,8 @@ yuxi_feedback <- function (path, pid, first) {
     ggplot2::scale_y_reverse() +
     ggplot2::ylim(min(long$time_r2, na.rm=T)-4000, max(long$time_r2, na.rm=T)+4000)-> e
   
-  # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig2.pdf",
-  #     width = 9.75, height = 5.32)
-  
-  pdf(paste(path, "/", pid, "/fig2.pdf", sep=""),
-       width = 9.75, height = 5.32)
+  png(filename = paste(path, "/", pid, "/fig2.png", sep = ""),
+      width = 9.75, height = 5.32, units = "in", res = 300)
   print(e)
   dev.off()
   
@@ -214,9 +204,10 @@ yuxi_feedback <- function (path, pid, first) {
                         list.files(path = path, pattern = ".csv", full.names = T, recursive = F))
   
   # file <- read.csv("/Users/phoebelam/Desktop/yuxi/Dissertation-Night Day 1_March 2, 2024_22.27.csv" )
-  
   # file <- read.csv('/Users/phoebelam/Desktop/yuxi/Dissertation-Night Day 1-Updated_April 3, 2024_12.20.csv')
   # file <- read.csv('/Users/phoebelam/Desktop/yuxi/Dissertation-Night Day 2-Updated_April 3, 2024_13.08.csv')
+  
+  # file <- read.csv('/Users/phoebelam/Desktop/yuxi/Dissertation-Night Day 1-Updated_March 11, 2024_13.36.csv')
   
   
   # loop
@@ -298,13 +289,10 @@ yuxi_feedback <- function (path, pid, first) {
     ggplot2::annotate("text", x= log$shoulddate[nrow(log)]-0.3, y = mean(log$pss_pomp)-3,
              label = paste("Your average"), color = '#637A9F', size = 4, fontface = 'bold') +
     ggplot2::theme(plot.title=element_text(face="bold", size = 15)) ->g
+
   
-  
-  # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig3.pdf",
-  #     width = 9.75, height = 5.32)
-  
-  pdf(paste(path, "/", pid, "/fig3.pdf", sep=""),
-       width = 9.75, height = 5.32)
+  png(paste(path, "/", pid, "/fig3.png", sep=""),
+       width = 9.75, height = 5.32, units = "in", res = 300)
   print(g)
   dev.off()
   
@@ -317,7 +305,6 @@ yuxi_feedback <- function (path, pid, first) {
   new %>%
     dplyr::mutate(pss_pomp_10 = pss_pomp/10) -> new
 
-  
   
   sleepcorr <- data.frame(type = c('Sleep duration:\nMinutes of actual sleep', 
                                    'Sleep efficiency: Percent of\ntime sleeping while in bed', 
@@ -338,7 +325,6 @@ yuxi_feedback <- function (path, pid, first) {
                              sign == 1 & type == 'Number of awakenings'~ paste('Increases by\n', abs(round(coef, 1)), ' times', sep=""))) %>%
     dplyr::mutate(label_pos = dplyr::case_when(sign == 1~ label),
                   label_neg = dplyr::case_when(sign == -1~ label))
-  
   
   
   ggplot2::ggplot(sleepcorr, aes(x=type, y=coef, fill = sign)) + 
@@ -367,15 +353,10 @@ yuxi_feedback <- function (path, pid, first) {
       size = 4, fontface = "bold",
       fill = "white", label.size = 0) -> corr
   
-  # pdf("/Users/phoebelam/Library/CloudStorage/GoogleDrive-phoebela@andrew.cmu.edu/My Drive/3_obs/students/committee/yuxi/figures/fig4.pdf",
-  #     width = 9.75, height = 5.32)
-  
-  pdf(paste(path, "/", pid, "/fig4.pdf", sep=""),
-       width = 9.75, height = 5.32)
+  png(paste(path, "/", pid, "/fig4.png", sep=""),
+       width = 9.75, height = 5.32, units = "in", res = 300)
   print(corr)
   dev.off()
-  
-  return('Done exporting figures, please check folder')
   
   
 }
@@ -384,8 +365,8 @@ yuxi_feedback <- function (path, pid, first) {
 # library(htmltools)
 # library(webshot)
 # yuxi_feedback(path = '/Users/phoebelam/Desktop/yuxi',
-#               id = 101,
-#               first = '2024-02-20')
+#               pid = 32024094100,
+#               first = '2024-03-20')
 
 
 
