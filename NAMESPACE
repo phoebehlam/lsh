@@ -2,6 +2,7 @@
 
 export(rth_feedback)
 export(rth_sleeplog)
+export(wc_idfkids)
 export(yuxi_feedback)
 export(yuxi_sleeplog)
 importFrom(magrittr,"%>%")
