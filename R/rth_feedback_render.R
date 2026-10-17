@@ -54,7 +54,7 @@ render_rth_feedback <- function(id, age, night_sav, morning_sav, sleep_csv,
   # Staff-only outputs: day/night pairing check and the resource-box log.
   staff_dir <- dirname(log_file)
   dir.create(staff_dir, showWarnings = FALSE, recursive = TRUE)
-  utils::write.csv(pairing_table(rep$days), file.path(staff_dir, sprintf("rth_pairing_%s.csv", id)),
+  utils::write.csv(pairing_table(rep$days, rep$clipped), file.path(staff_dir, sprintf("rth_pairing_%s.csv", id)),
                    row.names = FALSE, na = "")
   row <- data.frame(id = id, rendered = format(Sys.time(), "%Y-%m-%d %H:%M"),
                     diary_days = rep$n_diary, watch_nights = rep$n_nights,
@@ -116,6 +116,42 @@ render_rth_feedback <- function(id, age, night_sav, morning_sav, sleep_csv,
          "This is not common. ", tail, call. = FALSE)
   }
   invisible(TRUE)
+}
+
+#' Overview-card highlight: the link that stood out most (relative to its
+#' "about the same" band), phrased to fit a card.
+#' @keywords internal
+link_highlight <- function(links, s, kind = c("sleep", "mood"), n_days = NA) {
+  kind <- match.arg(kind)
+  u <- s$pomp_unit
+  pred <- c(stress_n = "1 more unpleasant event", pos_n = "1 more positive event",
+            help_n = "more helping", neg_pomp = sprintf("%d-pt higher negative mood", u),
+            pos_pomp = sprintf("%d-pt higher positive mood", u))
+  outc <- c(tst = "sleep", se = "sleep efficiency", sol = "time to fall asleep",
+            awakenings = "wake-ups", neg_pomp = "negative mood", pos_pomp = "positive mood")
+  if (is.null(links) || !nrow(links) || !any(links$status %in% c("shown", "about_same"))) {
+    return(list(value = "&mdash;", sub = sprintf("needs at least %d days with %s", s$min_days,
+                                                if (kind == "sleep") "a diary and sleep data" else "a diary")))
+  }
+  sh <- links[links$status == "shown", ]
+  if (!nrow(sh)) {
+    return(list(value = "About the same",
+                sub = if (kind == "sleep") "your sleep stayed steady across your days"
+                      else "your mood stayed steady across your events"))
+  }
+  sh$rel <- abs(sh$est) / unlist(s$same_band[sh$outcome])
+  # The card is about events, so prefer an event link; mood links only if
+  # none of the events stood out.
+  ev <- sh[sh$predictor %in% c("stress_n", "pos_n", "help_n"), ]
+  if (nrow(ev)) sh <- ev
+  x <- sh[which.max(sh$rel), ]
+  e <- x$est; a <- abs(e); sg <- if (e > 0) "+" else "&minus;"
+  value <- switch(x$outcome,
+    tst = , sol = paste0(sg, round(a), " min"),
+    awakenings = paste0(sg, format(round(a, 1), nsmall = 1)),
+    paste0(sg, round(a), if (round(a) == 1) " pt" else " pts"))
+  joiner <- if (kind == "sleep") "after days with" else "on days with"
+  list(value = value, sub = sprintf("%s %s %s", outc[[x$outcome]], joiner, pred[[x$predictor]]))
 }
 
 # Template helpers -------------------------------------------------------------

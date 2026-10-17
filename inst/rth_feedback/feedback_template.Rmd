@@ -51,10 +51,12 @@ tst_card <- if (has_sleep) fmt_hm(sl$tst) else "&mdash;"
 bed_card <- if (has_sleep) tm$mean_clock[tm$var == "bed"] else "&mdash;"
 cat(card("days", "Your events", fmt_num(dsm$stress_n), "unpleasant events a day"))
 cat(card("mood", "Your mood", if (has_diary) sprintf("%s/100", round(dsm$pos_pomp)) else "&mdash;", "average positive mood"))
-cat(card("mood-links", "Events &amp; mood", sprintf("%d days", sum(!is.na(d$stress_n) & !is.na(d$neg_pomp))), "with a diary"))
+hm <- link_highlight(r$mood_links, s, "mood")
+cat(card("mood-links", "Events &amp; mood", hm$value, hm$sub))
 cat(card("sleep", "Sleep", tst_card, "average sleep a night"))
 cat(card("sleep", "Sleep timing", bed_card, "average bedtime"))
-cat(card("sleep-links", "Events &amp; sleep", sprintf("%d days", sum(!is.na(d$stress_n) & !is.na(d$tst))), "with a diary and sleep data"))
+hs <- link_highlight(r$sleep_links, s, "sleep")
+cat(card("sleep-links", "Events &amp; sleep", hs$value, hs$sub))
 ```
 </nav>
 
@@ -154,7 +156,7 @@ if (enough) cat(events_sleep_html(r))
 
 <section id="note">
 <h2>A note on these numbers</h2>
-<p>Everything in this report describes only your own days, about two weeks of them. We did not run statistical tests on your data alone, because a couple of weeks from one person isn't what those tests are designed for. So a pattern here is a description of what happened, not evidence that one thing affects another, and it might look different over a different two weeks.</p>
+<p>Everything in this report describes only your own days, about two weeks of them. We did not run statistical tests on your data alone, because a couple of weeks from one person isn't what those tests are designed for. So a pattern here is a description of what happened, not evidence that one thing affects another, and it might look different over a different two weeks. When we look at how things went together, we also soften any very unusual night or day a little, so that a single one doesn&rsquo;t decide the whole pattern.</p>
 <p>That's where everyone's data come in. When we combine the diaries and sleep data from all the teens in Rise to Health, we have enough information to run statistical tests and ask questions like whether days with more unpleasant events tend to be followed by shorter sleep for teens in general, and which comes first. Those are the findings we'll share in our scientific publications. Stay tuned!</p>
 </section>
 

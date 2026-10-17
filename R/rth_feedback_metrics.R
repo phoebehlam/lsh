@@ -21,6 +21,12 @@ rth_settings <- function() {
     # When every day-to-night link is "about the same", show this many of the
     # largest ones anyway (0 = text only).
     same_show_top = 3,
+    # Before the "went together" slopes, values more than clip_mad_k robust
+    # spreads (MAD) from the teen's own median are pulled in to that limit, so
+    # one unusual night or day can't drive a pattern. Charts and averages use
+    # the real values. Set to Inf to turn off.
+    clip_mad_k = 3,
+    clip_vars  = c("tst", "se", "sol", "awakenings", "neg_pomp", "pos_pomp"),
     trigger_cutoff = 60,
     trigger_share  = 0.5,
     # Published reference values shown on the "at a glance" bars
@@ -221,9 +227,42 @@ resource_trigger <- function(days, s = rth_settings()) {
 
 # Everything the report needs, in one object -----------------------------------------
 
+#' Pull values more than k MADs from the median in to that limit
+#'
+#' Median and MAD (scaled to match the SD for normal data) come from the
+#' teen's own values. If the MAD is 0 (e.g. most days identical) nothing is
+#' changed, since there is no spread to judge against.
+#' @keywords internal
+winsorize_mad <- function(x, k = 3) {
+  ok <- !is.na(x)
+  if (!is.finite(k) || sum(ok) < 3) return(x)
+  med <- stats::median(x[ok]); m <- stats::mad(x[ok])
+  if (!is.finite(m) || m == 0) return(x)
+  pmin(pmax(x, med - k * m), med + k * m)
+}
+
+#' Apply winsorize_mad() to the link variables; records what changed
+#' @keywords internal
+clip_days <- function(days, s = rth_settings()) {
+  k <- if (is.null(s$clip_mad_k)) Inf else s$clip_mad_k
+  log <- list()
+  for (v in intersect(s$clip_vars, names(days))) {
+    new <- winsorize_mad(days[[v]], k)
+    ch <- which(!is.na(new) & new != days[[v]])
+    if (length(ch)) log[[v]] <- tibble::tibble(date = days$date[ch], var = v,
+                                               value = days[[v]][ch], used = new[ch])
+    days[[v]] <- new
+  }
+  empty <- tibble::tibble(date = as.Date(character()), var = character(),
+                          value = numeric(), used = numeric())
+  attr(days, "clipped") <- dplyr::bind_rows(c(list(empty), unname(log)))
+  days
+}
+
 compute_report <- function(id, age, night_diary, morning_diary, actigraphy,
                            s = rth_settings()) {
   days <- build_days(night_diary, morning_diary, actigraphy)
+  link_days <- clip_days(days, s)
   v <- rth_vars()
   list(
     id = id, age = age, settings = s, days = days,
@@ -234,9 +273,10 @@ compute_report <- function(id, age, night_diary, morning_diary, actigraphy,
     sleep     = sleep_summary(days, s),
     timing    = timing_summary(days, s),
     daysum    = days_summary(days),
-    mood_links  = link_table(days, c("stress_n", "pos_n", "help_n"),
+    mood_links  = link_table(link_days, c("stress_n", "pos_n", "help_n"),
                              v$mood_outcomes$var, s),
-    sleep_links = link_table(days, v$predictors$var, v$sleep_outcomes$var, s),
+    sleep_links = link_table(link_days, v$predictors$var, v$sleep_outcomes$var, s),
+    clipped   = attr(link_days, "clipped"),
     coherence = coherence(days, s),
     trigger   = resource_trigger(days, s)
   )
@@ -248,7 +288,15 @@ compute_report <- function(id, age, night_diary, morning_diary, actigraphy,
 #' for, whether there were duplicate entries, and whether watch data exist.
 #' Written next to the report so staff can verify the day/night matching.
 #' @keywords internal
-pairing_table <- function(days) {
+pairing_table <- function(days, clipped = NULL) {
+  clip_txt <- rep("", nrow(days))
+  if (!is.null(clipped) && nrow(clipped)) {
+    lab <- sprintf("%s %s->%s", clipped$var, signif(clipped$value, 3), signif(clipped$used, 3))
+    for (i in seq_len(nrow(days))) {
+      m <- which(clipped$date == days$date[i])
+      if (length(m)) clip_txt[i] <- paste(lab[m], collapse = "; ")
+    }
+  }
   f <- function(x) ifelse(is.na(x), NA_character_, format(x, "%Y-%m-%d %H:%M", tz = "UTC"))
   tibble::tibble(
     date                 = days$date,
@@ -260,6 +308,7 @@ pairing_table <- function(days) {
     watch_out_of_bed     = f(days$wake),
     watch_off_reported   = days$watch_off_flag,
     used_for_day_night_links = !is.na(days$stress_n) & !is.na(days$tst),
+    unusual_value_pulled_in = clip_txt,
     check = dplyr::case_when(
       days$night_entries > 1 | days$morning_entries > 1 ~ "more than one diary for this date; first finished kept",
       days$watch_off_flag %in% TRUE ~ "watch reported off that night",

@@ -51,8 +51,11 @@ test_that("simulated participant: report numbers match a direct calculation", {
   expect_equal(nrow(nd), 15)                 # one diary per day, morning entries re-dated
   expect_false(any(duplicated(nd$date)))
 
-  # Hand-fit one slope: stressful events -> that night's sleep time
-  dd <- rep$days[!is.na(rep$days$stress_n) & !is.na(rep$days$tst), ]
+  # Hand-fit one slope: stressful events -> that night's sleep time, on the
+  # values after unusual ones are pulled in (median +/- 3 MAD over all nights)
+  cd <- rep$days
+  cd$tst <- winsorize_mad(cd$tst, 3)
+  dd <- cd[!is.na(cd$stress_n) & !is.na(cd$tst), ]
   b <- coef(lm(tst ~ stress_n, data = dd))[["stress_n"]]
   got <- rep$sleep_links$est[rep$sleep_links$predictor == "stress_n" & rep$sleep_links$outcome == "tst"]
   expect_equal(got, b)
@@ -122,4 +125,48 @@ test_that("a sleep file from the wrong participant stops with a staff message", 
   expect_no_warning(render_rth_feedback("1234", 16, nd, md, file.path(ex, "sim_sleep_1234.csv"), out_dir = out))
   expect_equal(.lead_id(c("1171_coded.csv", "/a/b/0042-x.csv", "camilletest.csv", "12345_x.csv")),
                c("1171", "0042", NA, NA))
+})
+
+test_that("unusual values are pulled in (median +/- 3 MAD) before links, not in charts", {
+  expect_equal(winsorize_mad(c(1, 2, 3, 4, 100)), c(1, 2, 3, 4, 3 + 3 * stats::mad(c(1, 2, 3, 4, 100))))
+  expect_equal(winsorize_mad(c(0, 0, 0, 0, 40)), c(0, 0, 0, 0, 40))   # MAD 0: left alone
+  expect_equal(winsorize_mad(c(5, NA, 6, 7)), c(5, NA, 6, 7))
+  expect_equal(winsorize_mad(c(1, 2, 3, 4, 100), Inf), c(1, 2, 3, 4, 100))
+
+  ex <- file.path(.rth_home(), "example_data")
+  nd <- read_night_diary(file.path(ex, "sim_night_diary.sav"), "1234")
+  md <- read_morning_diary(file.path(ex, "sim_morning_diary.sav"), "1234")
+  ac <- read_actigraphy(file.path(ex, "sim_sleep_1234.csv"))
+  # One implausible night on the day with the highest negative mood
+  d0 <- build_days(nd, md, ac)
+  hi <- d0$date[which.max(ifelse(is.na(d0$tst), NA, d0$neg_pomp))]
+  ac$tst[ac$night == hi] <- 900
+  r_on  <- compute_report("1234", 16, nd, md, ac)
+  st <- rth_settings(); st$clip_mad_k <- Inf
+  r_off <- compute_report("1234", 16, nd, md, ac, st)
+  pick <- function(r) r$sleep_links$est[r$sleep_links$predictor == "neg_pomp" & r$sleep_links$outcome == "tst"]
+  expect_lt(abs(pick(r_on)), abs(pick(r_off)))
+  expect_true(any(r_on$clipped$var == "tst" & r_on$clipped$date %in% hi))
+  expect_equal(max(r_on$days$tst, na.rm = TRUE), 900)          # charts keep the real value
+  pt <- pairing_table(r_on$days, r_on$clipped)
+  expect_match(pt$unusual_value_pulled_in[which(pt$date == hi)], "^tst 900->")
+  expect_equal(nrow(r_off$clipped), 0)
+})
+
+test_that("overview cards show the standout link", {
+  s <- rth_settings()
+  l <- tibble::tibble(predictor = c("stress_n", "pos_n"), outcome = c("tst", "tst"), n = 14,
+                      est = c(-24, 12), status = c("shown", "shown"))
+  h <- link_highlight(l, s, "sleep")
+  expect_equal(h$value, "&minus;24 min")
+  expect_equal(h$sub, "sleep after days with 1 more unpleasant event")
+  l2 <- rbind(l, tibble::tibble(predictor = "pos_pomp", outcome = "awakenings", n = 14, est = -2.5, status = "shown"))
+  expect_equal(link_highlight(l2, s, "sleep")$value, "&minus;24 min")     # events first
+  expect_equal(link_highlight(l2[3, ], s, "sleep")$sub, "wake-ups after days with 25-pt higher positive mood")
+  l$status <- "about_same"
+  expect_equal(link_highlight(l, s, "sleep")$value, "About the same")
+  l$status <- "too_few_days"
+  expect_equal(link_highlight(l, s, "mood")$value, "&mdash;")
+  m <- tibble::tibble(predictor = "help_n", outcome = "pos_pomp", n = 14, est = 7.4, status = "shown")
+  expect_equal(link_highlight(m, s, "mood")$sub, "positive mood on days with more helping")
 })
