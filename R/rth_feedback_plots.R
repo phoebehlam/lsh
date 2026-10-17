@@ -173,14 +173,16 @@ plot_mood_change <- function(links, band = 5) {
   d$outcome <- factor(c(neg_pomp = "Negative mood", pos_pomp = "Positive mood")[d$outcome],
                       levels = c("Positive mood", "Negative mood"))
   ok <- d$status %in% c("shown", "about_same")
-  d$val <- ifelse(ok, d$est, NA_real_)
+  if (!"est_show" %in% names(d)) { d$est_show <- d$est; d$capped <- FALSE }
+  d$val <- ifelse(ok, d$est_show, NA_real_)
   d$val[ok & abs(d$val) < .1] <- .1          # a sliver so a zero still shows
-  d$txt <- mapply(function(e, s) {
+  d$txt <- mapply(function(e, s, cp) {
     if (s %in% c("too_few_days", "no_variation")) return("not enough days")
+    if (isTRUE(cp)) return(sprintf("%d+ pts %s", round(abs(e)), if (e > 0) "higher" else "lower"))
     r <- round(e)
     if (r == 0) return("0 pts")
     sprintf("%s%d %s", if (r > 0) "+" else intToUtf8(8722), abs(r), if (abs(r) == 1) "pt" else "pts")
-  }, links$est, links$status)
+  }, d$est_show, links$status, d$capped)
   d$val_lab <- ifelse(ok, d$val, 0)
   lim <- max(15, ceiling(max(abs(d$val), na.rm = TRUE) / 5) * 5 + 8)
   d$hj <- ifelse(!is.na(d$val) & d$val < 0, 1.12, -0.12)
@@ -194,7 +196,8 @@ plot_mood_change <- function(links, band = 5) {
     ggplot2::scale_fill_manual(values = c(`Negative mood` = rth_pal$stress,
                                           `Positive mood` = rth_pal$positive), guide = "none") +
     ggplot2::scale_x_continuous(limits = c(-lim, lim),
-                                labels = function(x) ifelse(x > 0, paste0("+", x), sub("-", intToUtf8(8722), as.character(x)))) +
+                                labels = function(x) ifelse(x == 0, "0\nyour typical",
+                                  ifelse(x > 0, paste0("+", x), sub("-", intToUtf8(8722), as.character(x))))) +
     ggplot2::facet_wrap(~predictor, ncol = 1) +
     ggplot2::labs(x = "Change in mood that day (points out of 100)", y = NULL) +
     theme_rth() +

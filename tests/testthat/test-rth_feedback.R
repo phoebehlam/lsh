@@ -170,3 +170,28 @@ test_that("overview cards show the standout link", {
   m <- tibble::tibble(predictor = "help_n", outcome = "pos_pomp", n = 14, est = 7.4, status = "shown")
   expect_equal(link_highlight(m, s, "mood")$sub, "positive mood on days with more helping")
 })
+
+test_that("very large differences are shown capped (e.g. 60+ min), efficiency in %", {
+  set.seed(4)
+  x <- rep(0:2, length.out = 14)
+  d <- tibble::tibble(date = Sys.Date() + 0:13, stress_n = x, pos_n = 1, help_n = 1,
+                      neg_pomp = 10 + stats::rnorm(14, 0, .5),
+                      pos_pomp = 50, tst = 420 + x * 120 + stats::rnorm(14, 0, 5),
+                      se = 88, sol = 15, awakenings = 2)
+  s <- rth_settings()
+  lt <- link_table(d, "stress_n", "tst", s)
+  expect_true(lt$capped)
+  expect_equal(lt$est_show, 60)
+  expect_gt(lt$est, 60)                                # raw estimate kept for staff
+  expect_equal(link_value("tst", 60, TRUE), "60+ min more")
+  expect_equal(link_value("tst", -60, TRUE), "60+ min less")
+  expect_equal(link_value("se", -4.4), "&minus;4%")
+  expect_equal(link_value("se", 10, TRUE), "10+% higher")
+  expect_equal(link_value("awakenings", -3, TRUE), "3+ fewer times")
+  expect_equal(link_value("tst", 24), "+24 min")
+  h <- link_highlight(lt, s, "sleep")
+  expect_equal(h$value, "60+ min")
+  expect_equal(h$sub, "more sleep after days with 1 more unpleasant event")
+  s2 <- s; s2$link_cap <- NULL                          # cap can be turned off
+  expect_false(link_table(d, "stress_n", "tst", s2)$capped)
+})

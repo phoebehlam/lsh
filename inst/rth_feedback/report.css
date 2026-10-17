@@ -130,7 +130,8 @@ details.link-detail > summary { color: var(--ink); }
 .c-zero { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: #9AA1AD; }
 .c-bar { position: absolute; top: 2px; height: 6px; border-radius: 3px; }
 .c-track .g-avg { z-index: 2; }
-.c-foot { display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); margin-top: 2px; }
+.c-foot { position: relative; display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); margin-top: 2px; }
+.c-mid { position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: .66rem; }
 .chips { line-height: 2.1; margin: 4px 0 0; }
 .chip { display: inline-block; background: #F3F0ED; border-radius: 999px; padding: 0 10px; font-size: .78rem; margin: 0 4px 0 0; white-space: nowrap; }
 .callout { background: #F7F5FB; border-left: 4px solid #9A8AE6; border-radius: 10px; padding: 12px 14px 4px; margin: 12px 0 4px; }

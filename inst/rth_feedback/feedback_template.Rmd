@@ -95,6 +95,7 @@ if (n_pair_mood >= s$min_days) {
   cat("<p>Each bar shows how your mood that day tended to differ on days with <strong>one more</strong> event. Bars inside the grey zone (less than 5 points out of 100 either way) we'd call &ldquo;about the same.&rdquo;</p>")
   cat(img_tag(plot_mood_change(ml, s$same_band[["neg_pomp"]]), height = 3.4,
               alt = "Change in mood on days with one more event"))
+  if (any(ml$capped %in% TRUE & ml$status == "shown")) cat(cap_note)
   cat('<div class="callout"><p><strong>What this can and can&rsquo;t tell you.</strong> These bars show what tended to happen <em>on the same day</em>, not what caused what, or which came first. Take helping others: if your negative mood tended to be lower on days you helped more, it could be that helping lifted your mood, that you were more likely to help when you were already in a good mood, or that something else about those days, like time with friends, made both more likely.</p></div>')
 }
 ```
@@ -108,7 +109,7 @@ if (!has_sleep) {
 } else {
   g <- r$guideline
   if (!is.null(g)) {
-    cat(sprintf('<p>The National Sleep Foundation recommends <strong>%d to %d hours</strong> of sleep a night for people %s. Over your %d nights with the watch, you slept <strong>%s</strong> on average, ranging from %s to %s.</p>',
+    cat(sprintf('<p>The National Sleep Foundation (NSF) recommends <strong>%d to %d hours</strong> of sleep a night for people %s. Over your %d nights with the watch, you slept <strong>%s</strong> on average, ranging from %s to %s.</p>',
                 g$lo, g$hi, g$group, r$n_nights, fmt_hm(sl$tst),
                 fmt_hm(r$sleep$min[r$sleep$var == "tst"]), fmt_hm(r$sleep$max[r$sleep$var == "tst"])))
   }
@@ -126,15 +127,13 @@ if (!has_sleep) {
   sd_tst <- r$sleep$sd[r$sleep$var == "tst"]
   cat(sprintf('<p>Sleep changes from night to night for everyone. Your sleep time usually landed within about <strong>%s</strong> of your average. This is called <em>sleep variability</em>: the smaller it is, the more regular your sleep.</p>',
               fmt_hm(sd_tst)))
-  cat('<p class="hint">Dots are nights, the dashed line is your average, and shaded bands are the reference ranges from above.</p>')
+  cat('<p class="hint">Dots are nights, the dashed line is your average, and shaded bands are the NSF reference ranges from above.</p>')
   cat(img_tag(plot_nights(d, r$guideline, s$ref_se_min, s$ref_sol_max), height = 3.2, alt = "Sleep measures across nights"))
   mid_sd <- tm$sd_min[tm$var == "midpoint"]
   cat(sprintf('<p>Each bar below is one night, from getting into bed (top) to getting up (bottom).%s</p>',
               if (!is.na(mid_sd)) sprintf(' The middle of your sleep shifted by about <strong>%s</strong> from night to night.', fmt_hm(mid_sd)) else ""))
   cat('<p class="legend"><span class="sw sw-bed"></span>In bed <span class="sw sw-sleep"></span>Asleep</p>')
   cat(img_tag(plot_sleep_window_v(d, s$clock_anchor_h), height = 1.45, alt = "Time in bed and asleep each night"))
-  cat(refs_html(c("Sleep regularity and mental health in teens (Castiglione-Fontanellaz et al., 2023)",
-                  "https://doi.org/10.1111/jsr.13865")))
   cat('<p class="bridge">So what goes along with a longer or shorter night, or a calmer or harder day? The next section looks at how your events and that night&rsquo;s sleep moved together.</p>')
 }
 ```

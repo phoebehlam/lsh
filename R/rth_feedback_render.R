@@ -118,6 +118,28 @@ render_rth_feedback <- function(id, age, night_sav, morning_sav, sleep_csv,
   invisible(TRUE)
 }
 
+#' Text for one "went together" difference, e.g. "+24 min", "-3%",
+#' "+1.3 times", or "60+ min more" when it reached the display cap.
+#' @keywords internal
+link_value <- function(o, e, capped = FALSE) {
+  a <- abs(e); up <- e > 0
+  if (isTRUE(capped)) {
+    return(switch(o,
+      tst = , sol = sprintf("%d+ min %s", round(a), if (up) "more" else "less"),
+      se = sprintf("%d+%% %s", round(a), if (up) "higher" else "lower"),
+      awakenings = sprintf("%s+ %s", format(a), if (up) "more times" else "fewer times"),
+      sprintf("%d+ pts %s", round(a), if (up) "higher" else "lower")))
+  }
+  sg <- if (up) "+" else "&minus;"
+  switch(o,
+    tst = , sol = paste0(sg, round(a), " min"),
+    se = paste0(sg, round(a), "%"),
+    awakenings = paste0(sg, format(round(a, 1), nsmall = 1), if (round(a, 1) == 1) " time" else " times"),
+    paste0(sg, round(a), if (round(a) == 1) " pt" else " pts"))
+}
+
+cap_note <- '<p class="hint">A &ldquo;+&rdquo; after a number (like 60+ min) means the difference was at least that big. With only about two weeks of days, we don&rsquo;t show exact numbers that large, because they can&rsquo;t be pinned down reliably.</p>'
+
 #' Overview-card highlight: the link that stood out most (relative to its
 #' "about the same" band), phrased to fit a card.
 #' @keywords internal
@@ -133,6 +155,7 @@ link_highlight <- function(links, s, kind = c("sleep", "mood"), n_days = NA) {
     return(list(value = "&mdash;", sub = sprintf("needs at least %d days with %s", s$min_days,
                                                 if (kind == "sleep") "a diary and sleep data" else "a diary")))
   }
+  if (!"est_show" %in% names(links)) { links$est_show <- links$est; links$capped <- FALSE }
   sh <- links[links$status == "shown", ]
   if (!nrow(sh)) {
     return(list(value = "About the same",
@@ -145,12 +168,21 @@ link_highlight <- function(links, s, kind = c("sleep", "mood"), n_days = NA) {
   ev <- sh[sh$predictor %in% c("stress_n", "pos_n", "help_n"), ]
   if (nrow(ev)) sh <- ev
   x <- sh[which.max(sh$rel), ]
-  e <- x$est; a <- abs(e); sg <- if (e > 0) "+" else "&minus;"
+  e <- x$est_show; a <- abs(e); up <- e > 0; sg <- if (up) "+" else "&minus;"
+  joiner <- if (kind == "sleep") "after days with" else "on days with"
+  if (isTRUE(x$capped)) {
+    # "60+ min" / "more sleep after days with ..."
+    value <- switch(x$outcome, tst = , sol = sprintf("%d+ min", round(a)), se = sprintf("%d+%%", round(a)),
+                    awakenings = sprintf("%s+", format(a)), sprintf("%d+ pts", round(a)))
+    dir <- switch(x$outcome, tst = , sol = if (up) "more" else "less",
+                  awakenings = if (up) "more" else "fewer", if (up) "higher" else "lower")
+    return(list(value = value, sub = sprintf("%s %s %s %s", dir, outc[[x$outcome]], joiner, pred[[x$predictor]])))
+  }
   value <- switch(x$outcome,
     tst = , sol = paste0(sg, round(a), " min"),
+    se = paste0(sg, round(a), "%"),
     awakenings = paste0(sg, format(round(a, 1), nsmall = 1)),
     paste0(sg, round(a), if (round(a) == 1) " pt" else " pts"))
-  joiner <- if (kind == "sleep") "after days with" else "on days with"
   list(value = value, sub = sprintf("%s %s %s", outc[[x$outcome]], joiner, pred[[x$predictor]]))
 }
 
@@ -201,20 +233,20 @@ glance_html <- function(r) {
   rng <- function(v, f) sprintf("Range across nights: %s to %s", f(get(v, "min")), f(get(v, "max")))
   paste0(
     '<p class="g-legend"><span class="lg lg-avg"></span>your average <span class="lg lg-range"></span>your range across nights',
-    '<span class="lg lg-ref"></span>reference range</p>',
+    '<span class="lg lg-ref"></span>NSF reference range</p>',
     row("Sleep time", "time the watch recorded you as asleep", fmt_hm(get("tst", "mean")),
         rng("tst", fmt_hm), "tst", h_lo, h_hi, div = 60,
-        ref = if (!is.null(g)) c(g$lo, g$hi), ref_txt = if (!is.null(g)) sprintf("Recommended: %d&ndash;%d h", g$lo, g$hi) else ""),
+        ref = if (!is.null(g)) c(g$lo, g$hi), ref_txt = if (!is.null(g)) sprintf("Recommended (NSF): %d&ndash;%d h", g$lo, g$hi) else ""),
     row("Time in bed", "from getting into bed to getting up", fmt_hm(get("tib", "mean")),
         rng("tib", fmt_hm), "tib", h_lo, h_hi, div = 60),
     timing_rows(r),
     row("Sleep efficiency", "the % of your time in bed that you spent asleep",
         paste0(round(get("se", "mean")), "%"), rng("se", function(x) paste0(round(x), "%")),
         "se", se_lo, 100, ref = c(s$ref_se_min, 100),
-        ref_txt = sprintf("Typical for good sleep: %d%% or more", s$ref_se_min)),
+        ref_txt = sprintf("Typical for good sleep (NSF): %d%% or more", s$ref_se_min)),
     row("Sleep latency", "how long it took you to fall asleep after getting into bed", fmt_hm(get("sol", "mean")),
         rng("sol", fmt_hm), "sol", 0, sol_hi, ref = c(0, s$ref_sol_max),
-        ref_txt = sprintf("Typical for good sleep: %d min or less", s$ref_sol_max)),
+        ref_txt = sprintf("Typical for good sleep (NSF): %d min or less", s$ref_sol_max)),
     row("Times you woke up", "how often the watch picked up you being awake during the night, even briefly",
         fmt_num(get("awakenings", "mean")), rng("awakenings", function(x) as.character(round(x))),
         "awakenings", 0, aw_hi)
@@ -245,12 +277,7 @@ events_sleep_html <- function(r) {
            neg_pomp = rth_pal$stress, pos_pomp = rth_pal$positive)
   outs <- c(tst = "Sleep time", se = "Sleep efficiency", sol = "Sleep latency", awakenings = "Times you woke up")
   unit_txt <- c(tst = "min", se = "points", sol = "min", awakenings = "times")
-  val <- function(o, e) {
-    a <- abs(e); sg <- if (e > 0) "+" else "&minus;"
-    switch(o, tst = paste0(sg, round(a), " min"), sol = paste0(sg, round(a), " min"),
-           se = paste0(sg, round(a), if (round(a) == 1) " pt" else " pts"),
-           awakenings = paste0(sg, format(round(a, 1), nsmall = 1), if (round(a, 1) == 1) " time" else " times"))
-  }
+  if (!"est_show" %in% names(sk)) { sk$est_show <- sk$est; sk$capped <- FALSE }
   shown <- sk[sk$status == "shown", ]
   same  <- sk[sk$status == "about_same", ]
   missing <- sk[sk$status %in% c("too_few_days", "no_variation"), ]
@@ -262,15 +289,15 @@ events_sleep_html <- function(r) {
       xp <- x[x$predictor == p, ]
       if (!nrow(xp)) next
       rows <- vapply(seq_len(nrow(xp)), function(i) {
-        o <- xp$outcome[i]; e <- xp$est[i]; band <- s$same_band[[o]]
+        o <- xp$outcome[i]; e <- xp$est_show[i]; band <- s$same_band[[o]]
         lim <- max(3 * band, abs(e) * 1.25)
         pos <- function(v) 50 + 50 * v / lim
         sprintf(paste0('<div class="c-row"><div class="g-top"><span>%s</span><span class="g-val">%s</span></div>',
                        '<div class="c-track"><div class="c-same" style="left:%.1f%%;width:%.1f%%"></div>',
                        '<div class="c-bar" style="left:%.1f%%;width:%.1f%%;background:%s"></div>',
                        '<div class="g-avg" style="left:50%%"></div></div>',
-                       '<div class="c-foot"><span>less than usual</span><span>more than usual</span></div></div>'),
-                outs[[o]], val(o, e), pos(-band), pos(band) - pos(-band),
+                       '<div class="c-foot"><span>less than usual</span><span class="c-mid">your typical</span><span>more than usual</span></div></div>'),
+                outs[[o]], link_value(o, e, xp$capped[i]), pos(-band), pos(band) - pos(-band),
                 min(pos(0), pos(e)), max(.6, abs(pos(e) - pos(0))), col[[p]])
       }, "")
       out <- paste0(out, sprintf('<div class="c-card" style="border-top-color:%s"><div class="c-title">%s&hellip;</div>%s</div>',
@@ -278,7 +305,7 @@ events_sleep_html <- function(r) {
     }
     out
   }
-  how_to_read <- 'The dark dot in the middle is your usual night, just like &ldquo;your average&rdquo; in the charts above. The colored bar shows how that night tended to differ: a bar to the right means more of that measure, to the left means less. A bar that stays inside the grey zone counts as &ldquo;about the same.&rdquo;'
+  how_to_read <- 'The dark dot in the middle (&ldquo;your typical&rdquo;) is your usual night, just like &ldquo;your average&rdquo; in the charts above. The colored bar shows how that night tended to differ: a bar to the right means more of that measure, to the left means less. A bar that stays inside the grey zone counts as &ldquo;about the same.&rdquo;'
 
   out <- ""
   if (!nrow(shown)) {
@@ -292,7 +319,8 @@ events_sleep_html <- function(r) {
                                  nrow(top), how_to_read), cards(top))
     }
   } else {
-    out <- paste0('<p>Each card compares a day with the sleep you got <em>that night</em>. We only show the ones that stood out. ', how_to_read, '</p>', cards(shown))
+    out <- paste0('<p>Each card compares a day with the sleep you got <em>that night</em>. We only show the ones that stood out. ', how_to_read, '</p>', cards(shown),
+                  if (any(shown$capped)) cap_note else "")
     if (nrow(same)) {
       chips <- paste(sprintf('<span class="chip">%s &rarr; %s</span>', short[same$predictor],
                              tolower(outs[same$outcome])), collapse = "")

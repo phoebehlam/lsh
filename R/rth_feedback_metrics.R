@@ -27,6 +27,11 @@ rth_settings <- function() {
     # the real values. Set to Inf to turn off.
     clip_mad_k = 3,
     clip_vars  = c("tst", "se", "sol", "awakenings", "neg_pomp", "pos_pomp"),
+    # Largest difference shown as an exact number in the "went together"
+    # sections. Bigger ones show as e.g. "60+ min": with ~2 weeks of days an
+    # estimate that large isn't reliable. (Sleep efficiency is in % points;
+    # mood caps apply to the events-and-mood chart.)
+    link_cap = c(tst = 60, sol = 45, se = 30, awakenings = 10, neg_pomp = 50, pos_pomp = 50),
     trigger_cutoff = 60,
     trigger_share  = 0.5,
     # Published reference values shown on the "at a glance" bars
@@ -184,8 +189,12 @@ link_table <- function(days, predictors, outcomes, s = rth_settings()) {
     for (o in outcomes) {
       if (p == o) next
       r <- within_slope(days[[p]], days[[o]], unit, s$same_band[[o]], s)
+      cap <- if (is.null(s$link_cap) || is.na(s$link_cap[o])) Inf else s$link_cap[[o]]
+      capped <- !is.na(r$est) & abs(r$est) > cap
       out[[length(out) + 1]] <- tibble::tibble(
-        predictor = p, outcome = o, n = r$n, est = r$est, status = r$status)
+        predictor = p, outcome = o, n = r$n, est = r$est, status = r$status,
+        # what the teen sees: the estimate, or the cap when it is larger
+        est_show = if (capped) sign(r$est) * cap else r$est, capped = capped)
     }
   }
   dplyr::bind_rows(out)
