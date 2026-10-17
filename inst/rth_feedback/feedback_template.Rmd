@@ -1,0 +1,208 @@
+---
+pagetitle: "Rise to Health - Your daily patterns"
+output:
+  html_document:
+    self_contained: true
+    theme: null
+    highlight: null
+    mathjax: null
+    css: report.css
+    section_divs: false
+params:
+  report: NULL
+  contact: "risetohealth@cmu.edu"
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, results = "asis")
+r  <- params$report
+d  <- r$days
+s  <- r$settings
+sl <- setNames(as.list(r$sleep$mean), r$sleep$var)
+tm <- r$timing
+ds <- r$daysum
+dsm <- setNames(as.list(ds$mean), ds$var)
+dom <- attr(ds, "domains")
+coh <- r$coherence
+dates <- range(d$date, na.rm = TRUE)
+has_sleep <- r$n_nights > 0
+has_diary <- r$n_diary > 0
+note <- function(x) cat(sprintf('<p class="note">%s</p>', x))
+```
+
+<header class="hero">
+<img class="logo" src="rth_logo.png" alt="Rise to Health, a Carnegie Mellon University study">
+<h1>Your daily patterns</h1>
+```{r}
+cat(sprintf('<p class="dates">%s to %s &middot; %d diary days &middot; %d nights with the watch</p>',
+            format(dates[1], "%B %d"), format(dates[2], "%B %d, %Y"), r$n_diary, r$n_nights))
+```
+</header>
+
+<section class="intro">
+<p><strong>Thank you for completing the daily assessments!</strong> For about two weeks you wore a sleep watch and told us about your days each night. This report puts those pieces together so you can see your own patterns.</p>
+<p>Everything here describes <em>your</em> days only. It shows what tended to happen together, not what caused what. We are researchers, not medical doctors, so we can't give health advice or interpretations.</p>
+</section>
+
+<p class="cards-hint"><strong>Your overview.</strong> Each card sums up one section of this report; scroll down for the details. On a computer, you can click a card to jump to its section.</p>
+<nav class="cards">
+```{r}
+tst_card <- if (has_sleep) fmt_hm(sl$tst) else "&mdash;"
+bed_card <- if (has_sleep) tm$mean_clock[tm$var == "bed"] else "&mdash;"
+cat(card("sleep", "Sleep", tst_card, "average sleep a night"))
+cat(card("timing", "Sleep timing", bed_card, "average bedtime"))
+cat(card("watch", "Watch vs. you", sprintf("%d nights", max(coh$n)), "compared side by side"))
+cat(card("days", "Your events", fmt_num(dsm$stress_n), "stressful events a day"))
+cat(card("mood-links", "Events &amp; mood", if (has_diary) sprintf("%s/100", round(dsm$pos_pomp)) else "&mdash;", "average positive mood"))
+cat(card("sleep-links", "Events &amp; sleep", sprintf("%d days", sum(!is.na(d$stress_n) & !is.na(d$tst))), "with a diary and sleep data"))
+```
+</nav>
+
+<section id="sleep">
+<h2>Your sleep at a glance</h2>
+```{r}
+if (!has_sleep) {
+  note("We didn't get usable sleep watch data for your nights, so this section is empty.")
+} else {
+  g <- r$guideline
+  if (!is.null(g)) {
+    cat(sprintf('<p>The National Sleep Foundation recommends <strong>%d to %d hours</strong> of sleep a night for people %s. Over your %d nights with the watch, you slept <strong>%s</strong> on average, ranging from %s to %s.</p>',
+                g$lo, g$hi, g$group, r$n_nights, fmt_hm(sl$tst),
+                fmt_hm(r$sleep$min[r$sleep$var == "tst"]), fmt_hm(r$sleep$max[r$sleep$var == "tst"])))
+  }
+  cat(glance_html(r))
+  sd_tst <- r$sleep$sd[r$sleep$var == "tst"]
+  cat('<h3>Night to night fluctuations</h3>')
+  cat(sprintf('<p>Sleep changes from night to night for everyone. Your sleep time usually landed within about <strong>%s</strong> of your average (one standard deviation). Researchers call this <em>sleep variability</em>: the smaller it is, the more regular your sleep.</p>',
+              fmt_hm(sd_tst)))
+  cat('<p class="hint">Each dot is one night. The dashed line is your own average. The shaded bands are the reference ranges from above: recommended sleep for your age, 85% or more sleep efficiency, and 30 minutes or less to fall asleep.</p>')
+  cat(img_tag(plot_nights(d, r$guideline, s$ref_se_min, s$ref_sol_max), height = 4.6, alt = "Sleep measures across nights"))
+  cat(refs_html(c("Sleep regularity and mental health in teens (Castiglione-Fontanellaz et al., 2023)",
+                  "https://doi.org/10.1111/jsr.13865")))
+}
+```
+</section>
+
+<section id="timing">
+<h2>When you slept</h2>
+```{r}
+if (!has_sleep) {
+  note("No sleep watch data to show here.")
+} else {
+  mid_sd <- tm$sd_min[tm$var == "midpoint"]
+  cat(sprintf('<p>On average you got into bed around <strong>%s</strong>, fell asleep around <strong>%s</strong>, and woke up around <strong>%s</strong>.</p>',
+              tm$mean_clock[tm$var == "bed"], tm$mean_clock[tm$var == "onset"], tm$mean_clock[tm$var == "offset"]))
+  if (!is.na(mid_sd)) {
+    cat(sprintf('<p>The middle of your sleep usually fell around %s, and it shifted by about <strong>%s</strong> from night to night (the smaller this number, the more regular your sleep timing).</p>',
+                tm$mean_clock[tm$var == "midpoint"], fmt_hm(mid_sd)))
+  }
+  cat('<p class="legend"><span class="sw sw-bed"></span>In bed <span class="sw sw-sleep"></span>Asleep</p>')
+  cat(img_tag(plot_sleep_window(d, s$clock_anchor_h), height = 0.7 + 0.21 * r$n_nights,
+              alt = "Time in bed and asleep each night"))
+}
+```
+</section>
+
+<section id="watch">
+<h2>The watch vs. your own reports</h2>
+```{r}
+cat("<p>Each morning you told us when you went to bed and woke up. Here's how your diary compared with the watch. The two often differ, and neither one is perfect: the watch senses movement, while your diary captures how the night felt to you. Research shows they can tell us different things, and sometimes relate differently to how people feel and function during the day.</p>")
+p <- plot_watch_vs_you(d)
+if (is.null(p)) {
+  note("There weren't enough nights with both a morning diary and watch data to compare.")
+} else {
+  cat(img_tag(p, height = 2.2, alt = "Hours in bed: watch versus your diary"))
+  cat("<ul class='facts'>")
+  for (i in seq_len(nrow(coh))) cat(sprintf("<li>%s</li>", coherence_sentence(coh$measure[i], coh$mean_diff[i], coh$n[i])))
+  cat("</ul>")
+  tr <- coherence_tracking(coh)
+  if (!is.null(tr)) cat(sprintf("<p>%s</p>", tr))
+  cat(refs_html(c("Diaries vs. watches in teens (Short et al., 2012)", "https://doi.org/10.1016/j.sleep.2011.11.005"),
+                c("How similar are reported and measured sleep? (Lauderdale et al., 2008)", "https://doi.org/10.1097/EDE.0b013e318187a7b0")))
+}
+q <- mean(d$sr_quality, na.rm = TRUE)
+if (!is.nan(q)) {
+  qlab <- c("very bad", "bad", "fair", "good", "very good")[round(q)]
+  cat(sprintf("<p>You rated your sleep quality <strong>%s</strong> on average (%s out of 5).</p>", qlab, fmt_num(q)))
+}
+```
+</section>
+
+<section id="days">
+<h2>Your events</h2>
+```{r}
+if (!has_diary) {
+  note("We didn't receive enough nightly diaries to show this section.")
+} else {
+  cat("<p>Each night you told us what happened that day. Here's what a typical day looked like for you, and how much that changed from day to day.</p>")
+  cat(events_glance_html(r))
+  cat(sources_html(dom))
+  cat("<h3>Your mood</h3>")
+  cat(sprintf("<p>You also rated how you felt each day. We put each mood on a 0 to 100 scale, where 0 is the lowest possible answer and 100 the highest. Your negative mood (like sad, worried, or lonely) averaged <strong>%s out of 100</strong>, and your positive mood (like happy, calm, or close to others) averaged <strong>%s out of 100</strong>.</p>",
+              round(dsm$neg_pomp), round(dsm$pos_pomp)))
+  cat(img_tag(plot_mood(d), height = 2.5, alt = "Daily mood"))
+  if (isTRUE(r$trigger$triggered)) {
+    cat('<div class="support-box"><p><strong>You told us that many of your days felt hard.</strong> That\'s worth paying attention to, and you don\'t have to handle it alone. Talking with someone you trust can help, and there are free, confidential resources you can reach any time.</p><p><a href="#support">See the support resources at the end of this report</a>.</p></div>')
+  }
+}
+```
+</section>
+
+<section id="mood-links">
+<h2>How your events and mood went together</h2>
+```{r}
+ml <- r$mood_links
+n_pair_mood <- sum(!is.na(d$stress_n) & !is.na(d$neg_pomp))
+if (n_pair_mood < s$min_days) {
+  note(sprintf("We need at least %d diary days to look at these patterns, and we have %d from you. Thanks for the ones you did complete!",
+               s$min_days, n_pair_mood))
+}
+ttl <- c(stress_n = "Stressful events", pos_n = "Positive events", help_n = "Helping others")
+if (n_pair_mood >= s$min_days) {
+  cat("<p>Each bar shows how your mood that day tended to differ on days with <strong>one more</strong> event. Bars inside the grey zone (less than 5 points out of 100 either way) we'd call &ldquo;about the same.&rdquo;</p>")
+  cat(img_tag(plot_mood_change(ml, s$same_band[["neg_pomp"]]), height = 3.4,
+              alt = "Change in mood on days with one more event"))
+  cat('<div class="callout"><p><strong>What this can and can&rsquo;t tell you.</strong> These bars show what tended to happen <em>on the same day</em>, not what caused what, or which came first. Take helping others: if your negative mood tended to be lower on days you helped more, it could be that helping lifted your mood, that you were more likely to help when you were already in a good mood, or that something else about those days, like time with friends, made both more likely.</p></div>')
+}
+```
+</section>
+
+<section id="sleep-links">
+<h2>How your events and that night&rsquo;s sleep went together</h2>
+```{r}
+sk <- r$sleep_links
+n_pair_sleep <- sum(!is.na(d$stress_n) & !is.na(d$tst))
+enough <- n_pair_sleep >= s$min_days
+if (!enough) {
+  note(sprintf("We need at least %d days with both a diary and a night of sleep watch data to look at these patterns, and we have %d from you.",
+               s$min_days, n_pair_sleep))
+}
+if (enough) cat(events_sleep_html(r))
+```
+</section>
+
+<section id="note">
+<h2>A note on these numbers</h2>
+<p>Everything in this report describes only your own days, about two weeks of them. We did not run statistical tests on your data alone, because a couple of weeks from one person isn't what those tests are designed for. So a pattern here is a description of what happened, not evidence that one thing affects another, and it might look different over a different two weeks.</p>
+<p>That's where everyone's data come in. When we combine the diaries and sleep data from all the teens in Rise to Health, we have enough information to run statistical tests and ask questions like whether stressful days tend to be followed by shorter sleep for teens in general, and which comes first. Those are the findings we'll share in our scientific publications. Stay tuned!</p>
+</section>
+
+<section id="support">
+<h2>Questions and support</h2>
+```{r}
+cat(sprintf('<p>If you have any questions about this report, email us at <a href="mailto:%1$s">%1$s</a>.</p>', params$contact))
+cat(sprintf('<details class="res-details"%s><summary>See support resources</summary><div class="resources">%s</div></details>',
+            if (isTRUE(r$trigger$triggered)) " open" else "", resources_html()))
+cat("<p>In a crisis, you can call <strong>988</strong> any time.</p>")
+```
+<p class="footer">Rise to Health &middot; Lifespan Stress and Health Lab &middot; Department of Psychology, Carnegie Mellon University</p>
+</section>
+
+<script>
+document.querySelectorAll('a[href^="#"]').forEach(function (a) {
+  a.addEventListener('click', function (e) {
+    var el = document.getElementById(a.getAttribute('href').slice(1));
+    if (el) { e.preventDefault(); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  });
+});
+</script>
