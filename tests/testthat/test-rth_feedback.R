@@ -201,3 +201,13 @@ test_that("'Most of them involved' only appears with 5 or more unpleasant events
   expect_false(grepl("Most of them", sources_html(c(family = 2, friends = 1, school = 1, unfair = 0))))
   expect_match(sources_html(c(family = 1, friends = 0, school = 0, unfair = 0)), "1 unpleasant event<")
 })
+
+test_that("the teen's report gets a participant-friendly file name", {
+  ex <- file.path(.rth_home(), "example_data")
+  out <- file.path(tempdir(), "rth_name_test")
+  p <- suppressMessages(render_rth_feedback("1234", 16, file.path(ex, "sim_night_diary.sav"),
+                                            file.path(ex, "sim_morning_diary.sav"),
+                                            file.path(ex, "sim_sleep_1234.csv"), out_dir = out))
+  expect_equal(basename(p), "RiseToHealth_YourDailyPatterns_1234.html")
+  expect_true(file.exists(p))
+})
