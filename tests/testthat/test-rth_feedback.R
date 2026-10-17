@@ -1,6 +1,6 @@
 # Tests for the Rise to Health feedback report (lshlab).
 # When run from source: source("dev/load_dev.R") first. Inside lshlab, testthat loads the package.
-if (!exists("rth_settings")) source("dev/load_dev.R")
+if (!exists("rth_settings")) source(file.path("..", "..", "dev", "load_dev.R"))
 library(testthat)
 
 test_that("multi-select blocks: NA if never answered, 0 if 'none' ticked", {

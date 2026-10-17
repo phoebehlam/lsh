@@ -1,11 +1,11 @@
-# Rise to Health feedback report – adding it to lshlab
+# Rise to Health feedback report – adding it to lsh
 
 ## Drop-in steps
 
-1. Copy into your lshlab package:
-   - `R/rth_feedback_*.R` → `lshlab/R/`
-   - `inst/rth_feedback/` → `lshlab/inst/rth_feedback/` (template, CSS, logo, simulated example data)
-   - `tests/testthat/test-rth_feedback.R` → `lshlab/tests/testthat/`
+1. Copy into your lsh package:
+   - `R/rth_feedback_*.R` → `lsh/R/`
+   - `inst/rth_feedback/` → `lsh/inst/rth_feedback/` (template, CSS, logo, simulated example data)
+   - `tests/testthat/test-rth_feedback.R` → `lsh/tests/testthat/`
 2. In `DESCRIPTION`, make sure these are listed:
    - `Depends: R (>= 4.1.0)` (the code uses the native pipe `|>`)
    - `Imports: dplyr, ggplot2, grid, haven, knitr, readr, rmarkdown, stats, tibble, utils`
@@ -14,13 +14,13 @@
 4. `devtools::test()` runs the checks. One test also uses the pilot sleep file if you
    set `Sys.setenv(RTH_PILOT_CSV = "path/to/camilletest_coded_scored_sleep.csv")`.
 
-The template is found with `system.file("rth_feedback", package = "lshlab")`, so
+The template is found with `system.file("rth_feedback", package = "lsh")`, so
 nothing is hard-coded to a folder on anyone's computer.
 
 ## Use
 
 ```r
-library(lshlab)
+library(lsh)
 render_rth_feedback(
   id = "1234", age = 16,
   night_sav   = "rth_adolescent_night_diary.sav",

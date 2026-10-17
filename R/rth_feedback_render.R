@@ -45,7 +45,7 @@ render_rth_feedback <- function(id, age, night_sav, morning_sav, sleep_csv,
   rmarkdown::render(file.path(work, "feedback_template.Rmd"),
                     output_file = out_file, output_dir = normalizePath(out_dir),
                     params = list(report = rep, contact = contact_email),
-                    envir = new.env(parent = globalenv()), quiet = TRUE)
+                    envir = new.env(parent = environment(render_rth_feedback)), quiet = TRUE)
 
   # Staff-only outputs: day/night pairing check and the resource-box log.
   staff_dir <- dirname(log_file)
@@ -67,12 +67,14 @@ render_rth_feedback <- function(id, age, night_sav, morning_sav, sleep_csv,
 }
 
 # Where the template, CSS and logo live: inst/rth_feedback in the installed
-# lshlab package, or the option set by dev/load_dev.R when working from source.
+# package (whatever it is named), or the option set by dev/load_dev.R when
+# working from source.
 .rth_home <- function() {
-  p <- system.file("rth_feedback", package = "lshlab")
+  pkg <- tryCatch(utils::packageName(environment(.rth_home)), error = function(e) NULL)
+  p <- if (is.null(pkg)) "" else system.file("rth_feedback", package = pkg)
   if (nzchar(p) && file.exists(file.path(p, "feedback_template.Rmd"))) return(p)
   p <- getOption("rth_feedback.home")
-  if (is.null(p)) stop("Can't find the report template: install lshlab or run dev/load_dev.R")
+  if (is.null(p)) stop("Can't find the report template: install the lsh package or run dev/load_dev.R")
   p
 }
 
@@ -129,6 +131,7 @@ glance_html <- function(r) {
         ref = if (!is.null(g)) c(g$lo, g$hi), ref_txt = if (!is.null(g)) sprintf("Recommended: %d&ndash;%d h", g$lo, g$hi) else ""),
     row("Time in bed", "from getting into bed to getting up", fmt_hm(get("tib", "mean")),
         rng("tib", fmt_hm), "tib", h_lo, h_hi, div = 60),
+    timing_rows(r),
     row("Sleep efficiency", "the % of your time in bed that you spent asleep",
         paste0(round(get("se", "mean")), "%"), rng("se", function(x) paste0(round(x), "%")),
         "se", se_lo, 100, ref = c(s$ref_se_min, 100),
@@ -155,12 +158,12 @@ refs_html <- function(...) {
 #' @keywords internal
 events_sleep_html <- function(r) {
   sk <- r$sleep_links; s <- r$settings
-  preds <- c(stress_n = "On days with 1 more stressful event",
+  preds <- c(stress_n = "On days with 1 more unpleasant event",
              pos_n    = "On days with 1 more positive event",
              help_n   = "On days you helped others 1 more time",
              neg_pomp = "On days your negative mood was 25 points higher",
              pos_pomp = "On days your positive mood was 25 points higher")
-  short <- c(stress_n = "stressful events", pos_n = "positive events", help_n = "helping others",
+  short <- c(stress_n = "unpleasant events", pos_n = "positive events", help_n = "helping others",
              neg_pomp = "negative mood", pos_pomp = "positive mood")
   col <- c(stress_n = rth_pal$stress, pos_n = rth_pal$positive, help_n = rth_pal$help,
            neg_pomp = rth_pal$stress, pos_pomp = rth_pal$positive)
@@ -169,22 +172,21 @@ events_sleep_html <- function(r) {
   val <- function(o, e) {
     a <- abs(e); sg <- if (e > 0) "+" else "&minus;"
     switch(o, tst = paste0(sg, round(a), " min"), sol = paste0(sg, round(a), " min"),
-           se = paste0(sg, round(a), " pts"), awakenings = paste0(sg, format(round(a, 1), nsmall = 1), " times"))
+           se = paste0(sg, round(a), if (round(a) == 1) " pt" else " pts"),
+           awakenings = paste0(sg, format(round(a, 1), nsmall = 1), if (round(a, 1) == 1) " time" else " times"))
   }
   shown <- sk[sk$status == "shown", ]
   same  <- sk[sk$status == "about_same", ]
   missing <- sk[sk$status %in% c("too_few_days", "no_variation"), ]
 
-  out <- ""
-  if (!nrow(shown)) {
-    out <- paste0(out, '<div class="callout"><p><strong>Your sleep looked about the same no matter what kind of day you had.</strong> On days with more stressful or positive events, more helping, or higher or lower mood, your sleep that night stayed about the same. That&rsquo;s a pattern too: for you, these two weeks of daytime ups and downs didn&rsquo;t show up much in your sleep.</p></div>')
-  } else {
-    out <- '<p>Each card compares a day with the sleep you got <em>that night</em>. We only show the ones that stood out. The dark dot in the middle is your usual night, just like &ldquo;your average&rdquo; in the charts above. The colored bar shows how that night tended to differ: a bar to the right means more of that measure, to the left means less. A bar that stays inside the grey zone would count as &ldquo;about the same.&rdquo;</p>'
+  # One card per kind of day, one row per sleep measure.
+  cards <- function(x) {
+    out <- ""
     for (p in names(preds)) {
-      x <- shown[shown$predictor == p, ]
-      if (!nrow(x)) next
-      rows <- vapply(seq_len(nrow(x)), function(i) {
-        o <- x$outcome[i]; e <- x$est[i]; band <- s$same_band[[o]]
+      xp <- x[x$predictor == p, ]
+      if (!nrow(xp)) next
+      rows <- vapply(seq_len(nrow(xp)), function(i) {
+        o <- xp$outcome[i]; e <- xp$est[i]; band <- s$same_band[[o]]
         lim <- max(3 * band, abs(e) * 1.25)
         pos <- function(v) 50 + 50 * v / lim
         sprintf(paste0('<div class="c-row"><div class="g-top"><span>%s</span><span class="g-val">%s</span></div>',
@@ -193,11 +195,28 @@ events_sleep_html <- function(r) {
                        '<div class="g-avg" style="left:50%%"></div></div>',
                        '<div class="c-foot"><span>less than usual</span><span>more than usual</span></div></div>'),
                 outs[[o]], val(o, e), pos(-band), pos(band) - pos(-band),
-                min(pos(0), pos(e)), abs(pos(e) - pos(0)), col[[p]])
+                min(pos(0), pos(e)), max(.6, abs(pos(e) - pos(0))), col[[p]])
       }, "")
       out <- paste0(out, sprintf('<div class="c-card" style="border-top-color:%s"><div class="c-title">%s&hellip;</div>%s</div>',
                                  col[[p]], preds[[p]], paste(rows, collapse = "")))
     }
+    out
+  }
+  how_to_read <- 'The dark dot in the middle is your usual night, just like &ldquo;your average&rdquo; in the charts above. The colored bar shows how that night tended to differ: a bar to the right means more of that measure, to the left means less. A bar that stays inside the grey zone counts as &ldquo;about the same.&rdquo;'
+
+  out <- ""
+  if (!nrow(shown)) {
+    out <- paste0(out, '<div class="callout"><p><strong>Your sleep looked about the same no matter what kind of day you had.</strong> On days with more unpleasant or positive events, more helping, or higher or lower mood, your sleep that night stayed about the same. That&rsquo;s a pattern too: for you, these two weeks of daytime ups and downs didn&rsquo;t show up much in your sleep.</p></div>')
+    k <- s$same_show_top
+    if (!is.null(k) && k > 0 && nrow(same)) {
+      same$rel <- abs(same$est) / unlist(s$same_band[same$outcome])
+      top <- same[order(-same$rel), ][seq_len(min(k, nrow(same))), ]
+      top <- top[order(match(top$predictor, names(preds))), ]
+      out <- paste0(out, sprintf('<p>Here are your %d largest differences, so you can see what &ldquo;about the same&rdquo; looks like. %s Notice that all of these bars stay inside the grey zone.</p>',
+                                 nrow(top), how_to_read), cards(top))
+    }
+  } else {
+    out <- paste0('<p>Each card compares a day with the sleep you got <em>that night</em>. We only show the ones that stood out. ', how_to_read, '</p>', cards(shown))
     if (nrow(same)) {
       chips <- paste(sprintf('<span class="chip">%s &rarr; %s</span>', short[same$predictor],
                              tolower(outs[same$outcome])), collapse = "")
@@ -205,7 +224,7 @@ events_sleep_html <- function(r) {
                                  nrow(same), nrow(sk), chips))
     }
   }
-  out <- paste0(out, '<div class="callout"><p><strong>What this can and can&rsquo;t tell you.</strong> Here there is an order: the day comes first, then the night. So these cards show how a day tended to be followed by that night&rsquo;s sleep. That still isn&rsquo;t the same as one causing the other. Take stressful days: if you tended to sleep less after them, it could be that stress kept you up, or that something else, like a late practice or a big assignment due, both made the day stressful and pushed your bedtime later. A short night before could also make the next day feel more stressful.</p></div>')
+  out <- paste0(out, '<div class="callout"><p><strong>What this can and can&rsquo;t tell you.</strong> Here there is an order: the day comes first, then the night. So this section looks at how a day tended to be followed by that night&rsquo;s sleep. That still isn&rsquo;t the same as one causing the other. Take days with more unpleasant events: if you tended to sleep less after them, it could be that what happened kept you up, or that something else, like a late practice or a big assignment due, both made the day harder and pushed your bedtime later. A short night before could also make the next day feel harder.</p></div>')
   if (nrow(missing)) {
     out <- paste0(out, sprintf('<p class="hint">Not enough days to look at: %s.</p>',
                                paste(unique(sprintf("%s and %s", short[missing$predictor], tolower(outs[missing$outcome]))), collapse = "; ")))
@@ -223,7 +242,7 @@ events_glance_html <- function(r) {
   row <- function(v, name, def, col) {
     av <- get(v, "mean"); if (is.na(av)) return("")
     mn <- get(v, "min"); mx <- get(v, "max")
-    hi <- max(5, ceiling(mx))
+    hi <- max(5, ceiling(mx) + 1)
     sprintf(paste0(
       '<div class="g-row"><div class="g-top"><span class="g-name">%s<span class="hint">%s</span></span>',
       '<span class="g-val">%s <span class="g-unit">a day</span></span></div>',
@@ -235,21 +254,42 @@ events_glance_html <- function(r) {
   }
   paste0(
     '<p class="g-legend"><span class="lg lg-avg"></span>your average <span class="lg lg-range"></span>your range across days</p>',
-    row("stress_n", "Stressful events", "like arguments, lots of schoolwork, or being left out", rth_pal$stress),
-    row("pos_n", "Positive events", "like quality time or feeling cared for by family or friends", rth_pal$positive),
+    row("stress_n", "Unpleasant events", "like arguments, lots of schoolwork, or being left out", rth_pal$stress),
+    row("pos_n", "Positive events", "like quality time or feeling cared for by family or friends", rth_pal$sleep),
     row("help_n", "Times you helped others", "like helping with chores, giving advice, or standing up for someone", rth_pal$help))
 }
 
-#' Where stressful events came from: one bar per source, counts across all diaries
+#' Where unpleasant events came from: one bar per source, counts across all diaries
 #' @keywords internal
 sources_html <- function(dom) {
   tot <- sum(dom)
-  if (tot == 0) return("<p>You didn't report any stressful events in your diaries.</p>")
+  if (tot == 0) return("<p>You didn't report any unpleasant events in your diaries.</p>")
   nm <- c(family = "Family", friends = "Friends or peers", school = "School", unfair = "Being treated unfairly")
   dom <- sort(dom, decreasing = TRUE)
   rows <- vapply(names(dom), function(k) sprintf(
     '<div class="s-row"><span class="s-name">%s</span><span class="s-bar"><span style="width:%.1f%%"></span></span><span class="s-n">%d</span></div>',
     nm[[k]], dom[[k]] / max(dom) * 100, dom[[k]]), "")
-  sprintf('<h3>Where your stressful events came from</h3><p>Across all your diaries you reported <strong>%d stressful events</strong>. Most of them involved <strong>%s</strong>.</p><div class="sources">%s</div>',
+  sprintf('<h4 class="sub">Where your unpleasant events came from</h4><p>Across all your diaries you reported <strong>%d unpleasant events</strong>. Most of them involved <strong>%s</strong>.</p><div class="sources">%s</div>',
           tot, tolower(nm[[names(dom)[1]]]), paste(rows, collapse = ""))
+}
+
+#' Bedtime and wake-up time rows for the "at a glance" block, on a clock track
+#' @keywords internal
+timing_rows <- function(r) {
+  a <- r$settings$clock_anchor_h
+  one <- function(x, name, def, lo_h, hi_h) {
+    m <- .clock_min(x, a); m <- m[!is.na(m)]
+    if (!length(m)) return("")
+    lo <- min(lo_h * 60, floor(min(m) / 60) * 60); hi <- max(hi_h * 60, ceiling(max(m) / 60) * 60)
+    pct <- function(v) (v - lo) / (hi - lo) * 100
+    sprintf(paste0(
+      '<div class="g-row"><div class="g-top"><span class="g-name">%s<span class="hint">%s</span></span><span class="g-val">%s</span></div>',
+      '<div class="g-track"><div class="g-range" style="left:%.1f%%;width:%.1f%%"></div><div class="g-avg" style="left:%.1f%%"></div></div>',
+      '<div class="g-foot"><span>Range across nights: %s to %s</span><span>%s&ndash;%s</span></div></div>'),
+      name, def, fmt_clock(mean(m), a), pct(min(m)), max(.8, pct(max(m)) - pct(min(m))), pct(mean(m)),
+      fmt_clock(min(m), a), fmt_clock(max(m), a), sub(":00", "", fmt_clock(lo, a)), sub(":00", "", fmt_clock(hi, a)))
+  }
+  # Anchor is 6 PM, so 2 h = 8 PM, 8 h = 2 AM, 11 h = 5 AM, 17 h = 11 AM.
+  paste0(one(r$days$bed, "Bedtime", "when you got into bed", 2, 8),
+         one(r$days$wake, "Wake-up time", "when you got out of bed", 11, 17))
 }

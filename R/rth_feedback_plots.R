@@ -75,7 +75,10 @@ plot_nights <- function(days, guideline = NULL, ref_se_min = 85, ref_sol_max = 3
     ggplot2::geom_line(colour = rth_pal$sleep, linewidth = .lw) +
     ggplot2::geom_point(colour = rth_pal$sleep, size = .pt) +
     ggplot2::facet_wrap(~panel, ncol = 1, scales = "free_y") +
-    .date_axis() + ggplot2::labs(x = NULL, y = NULL) + theme_rth()
+    ggplot2::scale_y_continuous(breaks = function(l) pretty(l, n = 3)) +
+    .date_axis() + ggplot2::labs(x = NULL, y = NULL) + theme_rth() +
+    ggplot2::theme(panel.spacing.y = grid::unit(2, "pt"),
+                   strip.text = ggplot2::element_text(margin = ggplot2::margin(1, 0, 1, 0)))
 }
 
 #' Sleep window per night: in bed (light) and asleep (darker), on a clock axis
@@ -124,7 +127,7 @@ plot_watch_vs_you <- function(days) {
 plot_events <- function(days) {
   d <- dplyr::filter(days, !is.na(stress_n) | !is.na(pos_n) | !is.na(help_n))
   long <- dplyr::bind_rows(
-    tibble::tibble(date = d$date, panel = "Stressful events", n = d$stress_n),
+    tibble::tibble(date = d$date, panel = "Unpleasant events", n = d$stress_n),
     tibble::tibble(date = d$date, panel = "Positive events", n = d$pos_n),
     tibble::tibble(date = d$date, panel = "Times you helped others", n = d$help_n))
   long$panel <- factor(long$panel, levels = unique(long$panel))
@@ -133,7 +136,7 @@ plot_events <- function(days) {
     ggplot2::geom_col(width = .62) +
     ggplot2::geom_hline(data = avg, ggplot2::aes(yintercept = m),
                         linetype = "22", colour = rth_pal$ink, linewidth = .3) +
-    ggplot2::scale_fill_manual(values = c(`Stressful events` = rth_pal$stress,
+    ggplot2::scale_fill_manual(values = c(`Unpleasant events` = rth_pal$stress,
                                           `Positive events` = rth_pal$positive,
                                           `Times you helped others` = rth_pal$help),
                                guide = "none") +
@@ -153,7 +156,7 @@ plot_mood <- function(days) {
   ggplot2::ggplot(long, ggplot2::aes(date, v, colour = who, shape = who)) +
     ggplot2::geom_line(linewidth = .lw) + ggplot2::geom_point(size = .pt + .2) +
     ggplot2::scale_colour_manual(values = c(`Negative mood` = rth_pal$stress,
-                                            `Positive mood` = rth_pal$positive)) +
+                                            `Positive mood` = rth_pal$sleep)) +
     ggplot2::scale_shape_manual(values = c(`Negative mood` = 16, `Positive mood` = 17)) +
     ggplot2::scale_y_continuous(limits = c(0, 100), breaks = c(0, 25, 50, 75, 100)) +
     .date_axis() + ggplot2::labs(x = NULL, y = "Out of 100") + theme_rth()
@@ -162,7 +165,7 @@ plot_mood <- function(days) {
 #' Change in mood on days with one more event: one shared axis (mood points)
 #' @keywords internal
 plot_mood_change <- function(links, band = 5) {
-  ttl <- c(stress_n = "On days with 1 more stressful event",
+  ttl <- c(stress_n = "On days with 1 more unpleasant event",
            pos_n = "On days with 1 more positive event",
            help_n = "On days you helped others 1 more time")
   d <- links
@@ -198,4 +201,23 @@ plot_mood_change <- function(links, band = 5) {
     ggplot2::theme(panel.grid.major.y = ggplot2::element_blank(),
                    panel.grid.major.x = ggplot2::element_line(colour = rth_pal$grid, linewidth = .3),
                    strip.text = ggplot2::element_text(face = "bold", colour = rth_pal$ink))
+}
+
+#' Sleep window per night as vertical bars: dates across, clock time down
+#' @keywords internal
+plot_sleep_window_v <- function(days, anchor_h = 18) {
+  d <- dplyr::filter(days, !is.na(bed), !is.na(wake))
+  cm <- function(x) .clock_min(x, anchor_h) / 60
+  d <- dplyr::mutate(d, b = cm(bed), w = cm(wake), on = cm(onset), off = cm(offset))
+  lo <- floor(min(d$b, na.rm = TRUE)) - .3; hi <- ceiling(max(d$w, na.rm = TRUE)) + .3
+  brks <- seq(0, 18, by = 4); brks <- brks[brks >= lo & brks <= hi]
+  lbls <- sub(":00", "", sapply(brks * 60, fmt_clock, anchor_h = anchor_h))
+  ggplot2::ggplot(d, ggplot2::aes(x = date)) +
+    ggplot2::geom_segment(ggplot2::aes(xend = date, y = b, yend = w),
+                          colour = rth_pal$sleep_light, linewidth = 2.6, lineend = "round") +
+    ggplot2::geom_segment(ggplot2::aes(xend = date, y = on, yend = off),
+                          colour = rth_pal$sleep, linewidth = 2.6, lineend = "round") +
+    ggplot2::scale_y_reverse(breaks = brks, labels = lbls, limits = c(hi, lo)) +
+    .date_axis() + ggplot2::labs(x = NULL, y = NULL) + theme_rth() +
+    ggplot2::theme(panel.grid.major.y = ggplot2::element_line(colour = rth_pal$grid, linewidth = .3))
 }

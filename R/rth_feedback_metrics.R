@@ -18,6 +18,9 @@ rth_settings <- function() {
                   neg_pomp = 5, pos_pomp = 5),
     # Resource list trigger: negative mood POMP >= cutoff on >= share of days,
     # with at least min_days completed diaries.
+    # When every day-to-night link is "about the same", show this many of the
+    # largest ones anyway (0 = text only).
+    same_show_top = 3,
     trigger_cutoff = 60,
     trigger_share  = 0.5,
     # Published reference values shown on the "at a glance" bars
@@ -32,7 +35,7 @@ rth_vars <- function() {
   list(
     predictors = tibble::tribble(
       ~var,       ~short,              ~when_more,                                        ~type,
-      "stress_n", "Stressful events",  "reported one more stressful event",              "count",
+      "stress_n", "Unpleasant events",  "reported one more unpleasant event",              "count",
       "pos_n",    "Positive events",   "reported one more positive event",               "count",
       "help_n",   "Helping others",    "helped someone one more time",                   "count",
       "neg_pomp", "Negative mood",     "rated your negative mood 25 points higher (out of 100)", "pomp",

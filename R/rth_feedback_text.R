@@ -1,8 +1,8 @@
 # Sentence builders. descriptives. 
 .pred_text <- list(
-  stress_n = list(more = "reported one more stressful event",
-                  general = "On days with more stressful events",
-                  noun = "stressful events"),
+  stress_n = list(more = "reported one more unpleasant event",
+                  general = "On days with more unpleasant events",
+                  noun = "unpleasant events"),
   pos_n    = list(more = "reported one more positive event",
                   general = "On days with more positive events",
                   noun = "positive events"),

@@ -42,13 +42,15 @@ section.intro { background: transparent; border: none; padding: 4px 2px; }
 .card {
   display: flex; flex-direction: column; gap: 2px; text-decoration: none; color: var(--ink);
   background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 12px 10px;
-  border-top: 4px solid var(--accent);
+  border-top: 4px solid #7D93B5;
 }
-.card:nth-child(2) { border-top-color: var(--accent-2); }
-.card:nth-child(3) { border-top-color: var(--sleep); }
-.card:nth-child(4) { border-top-color: var(--accent); }
-.card:nth-child(5) { border-top-color: var(--teal); }
-.card:nth-child(6) { border-top-color: #9A8AE6; }
+/* Card accents run cool to warm, starting with blue. */
+.card:nth-child(1) { border-top-color: #7D93B5; }
+.card:nth-child(2) { border-top-color: #2FB5A6; }
+.card:nth-child(3) { border-top-color: #9A8AE6; }
+.card:nth-child(4) { border-top-color: #F7A35C; }
+.card:nth-child(5) { border-top-color: #EE8A72; }
+.card:nth-child(6) { border-top-color: #E8879C; }
 .card:active, .card:hover { background: #FFFCFA; }
 .card-title { font-size: .78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .card-value { font-size: 1.3rem; font-weight: 700; line-height: 1.25; }
@@ -137,7 +139,7 @@ details.link-detail > summary { color: var(--ink); }
 .g-unit { font-weight: 400; font-size: .8rem; color: var(--muted); }
 .sources { margin: 4px 0 8px; }
 .s-row { display: grid; grid-template-columns: 9.5rem 1fr 2rem; align-items: center; gap: 8px; padding: 5px 0; font-size: .9rem; }
-.s-bar { height: 10px; background: #F6F4F1; border-radius: 5px; overflow: hidden; }
+.s-bar { height: 10px; background: #F3F0ED; border-radius: 5px; overflow: hidden; }
 .s-bar span { display: block; height: 100%; background: #EE8A72; border-radius: 5px; }
 .s-n { text-align: right; font-weight: 700; }
 details.res-details > summary { color: var(--ink); }
@@ -146,3 +148,8 @@ details.res-details > summary { color: var(--ink); }
 .cards-hint { font-size: .8rem; color: var(--muted); margin: 10px 2px 4px; }
 .card-title { display: flex; justify-content: space-between; align-items: center; }
 .card-go { font-size: 1.15rem; line-height: 1; color: var(--muted); font-weight: 400; }
+
+h4.sub { text-transform: none; letter-spacing: 0; color: var(--ink); font-size: .98rem; margin: 1.1rem 0 .4rem; }
+#mood { scroll-margin-top: 12px; }
+
+.bridge { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); font-style: italic; color: var(--ink); }
