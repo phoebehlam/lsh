@@ -372,8 +372,10 @@ sources_html <- function(dom) {
   rows <- vapply(names(dom), function(k) sprintf(
     '<div class="s-row"><span class="s-name">%s</span><span class="s-bar"><span style="width:%.1f%%"></span></span><span class="s-n">%d</span></div>',
     nm[[k]], dom[[k]] / max(dom) * 100, dom[[k]]), "")
-  sprintf('<h4 class="sub">Where your unpleasant events came from</h4><p>Across all your diaries you reported <strong>%d unpleasant events</strong>. Most of them involved <strong>%s</strong>.</p><div class="sources">%s</div>',
-          tot, tolower(nm[[names(dom)[1]]]), paste(rows, collapse = ""))
+  # With only a few events, "most of them" isn't meaningful, so skip it.
+  most <- if (tot >= 5) sprintf(" Most of them involved <strong>%s</strong>.", tolower(nm[[names(dom)[1]]])) else ""
+  sprintf('<h4 class="sub">Where your unpleasant events came from</h4><p>Across all your diaries you reported <strong>%d unpleasant %s</strong>.%s</p><div class="sources">%s</div>',
+          tot, if (tot == 1) "event" else "events", most, paste(rows, collapse = ""))
 }
 
 #' Bedtime and wake-up time rows for the "at a glance" block, on a clock track

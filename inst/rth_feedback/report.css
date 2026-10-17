@@ -126,7 +126,7 @@ details.link-detail > summary { color: var(--ink); }
 .c-title { font-weight: 700; margin-bottom: 4px; }
 .c-row { padding: 6px 0 8px; font-size: .92rem; }
 .c-track { position: relative; height: 10px; margin-top: 6px; background: #F6F4F1; border-radius: 5px; }
-.c-same { position: absolute; top: 0; bottom: 0; background: #E6E1DC; border-radius: 5px; }
+.c-same { position: absolute; top: 0; bottom: 0; background: #D5CEC6; border-radius: 5px; }
 .c-zero { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: #9AA1AD; }
 .c-bar { position: absolute; top: 2px; height: 6px; border-radius: 3px; }
 .c-track .g-avg { z-index: 2; }

@@ -195,3 +195,9 @@ test_that("very large differences are shown capped (e.g. + >60 min), efficiency 
   s2 <- s; s2$link_cap <- NULL                          # cap can be turned off
   expect_false(link_table(d, "stress_n", "tst", s2)$capped)
 })
+
+test_that("'Most of them involved' only appears with 5 or more unpleasant events", {
+  expect_match(sources_html(c(family = 3, friends = 1, school = 1, unfair = 0)), "Most of them involved")
+  expect_false(grepl("Most of them", sources_html(c(family = 2, friends = 1, school = 1, unfair = 0))))
+  expect_match(sources_html(c(family = 1, friends = 0, school = 0, unfair = 0)), "1 unpleasant event<")
+})
