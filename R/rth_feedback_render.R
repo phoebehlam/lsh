@@ -119,18 +119,19 @@ render_rth_feedback <- function(id, age, night_sav, morning_sav, sleep_csv,
 }
 
 #' Text for one "went together" difference, e.g. "+24 min", "-3%",
-#' "+1.3 times", or "60+ min more" when it reached the display cap.
+#' "+1.3 times", or "+ >60 min" when it was bigger than the display cap.
 #' @keywords internal
 link_value <- function(o, e, capped = FALSE) {
   a <- abs(e); up <- e > 0
-  if (isTRUE(capped)) {
-    return(switch(o,
-      tst = , sol = sprintf("%d+ min %s", round(a), if (up) "more" else "less"),
-      se = sprintf("%d+%% %s", round(a), if (up) "higher" else "lower"),
-      awakenings = sprintf("%s+ %s", format(a), if (up) "more times" else "fewer times"),
-      sprintf("%d+ pts %s", round(a), if (up) "higher" else "lower")))
-  }
   sg <- if (up) "+" else "&minus;"
+  if (isTRUE(capped)) {
+    # Same look as other values, with ">" for "more than": "+ >60 min"
+    return(switch(o,
+      tst = , sol = sprintf("%s &gt;%d min", sg, round(a)),
+      se = sprintf("%s &gt;%d%%", sg, round(a)),
+      awakenings = sprintf("%s &gt;%s times", sg, format(a)),
+      sprintf("%s &gt;%d pts", sg, round(a))))
+  }
   switch(o,
     tst = , sol = paste0(sg, round(a), " min"),
     se = paste0(sg, round(a), "%"),
@@ -138,7 +139,7 @@ link_value <- function(o, e, capped = FALSE) {
     paste0(sg, round(a), if (round(a) == 1) " pt" else " pts"))
 }
 
-cap_note <- '<p class="hint">A &ldquo;+&rdquo; after a number (like 60+ min) means the difference was at least that big. With only about two weeks of days, we don&rsquo;t show exact numbers that large, because they can&rsquo;t be pinned down reliably.</p>'
+cap_note <- '<p class="hint">A &ldquo;&gt;&rdquo; before a number (like &gt;60 min) means the difference was bigger than that. With only about two weeks of days, we don&rsquo;t show exact numbers that large, because they can&rsquo;t be pinned down reliably.</p>'
 
 #' Overview-card highlight: the link that stood out most (relative to its
 #' "about the same" band), phrased to fit a card.
@@ -171,12 +172,10 @@ link_highlight <- function(links, s, kind = c("sleep", "mood"), n_days = NA) {
   e <- x$est_show; a <- abs(e); up <- e > 0; sg <- if (up) "+" else "&minus;"
   joiner <- if (kind == "sleep") "after days with" else "on days with"
   if (isTRUE(x$capped)) {
-    # "60+ min" / "more sleep after days with ..."
-    value <- switch(x$outcome, tst = , sol = sprintf("%d+ min", round(a)), se = sprintf("%d+%%", round(a)),
-                    awakenings = sprintf("%s+", format(a)), sprintf("%d+ pts", round(a)))
-    dir <- switch(x$outcome, tst = , sol = if (up) "more" else "less",
-                  awakenings = if (up) "more" else "fewer", if (up) "higher" else "lower")
-    return(list(value = value, sub = sprintf("%s %s %s %s", dir, outc[[x$outcome]], joiner, pred[[x$predictor]])))
+    value <- switch(x$outcome, tst = , sol = sprintf("%s &gt;%d min", sg, round(a)),
+                    se = sprintf("%s &gt;%d%%", sg, round(a)),
+                    awakenings = sprintf("%s &gt;%s", sg, format(a)), sprintf("%s &gt;%d pts", sg, round(a)))
+    return(list(value = value, sub = sprintf("%s %s %s", outc[[x$outcome]], joiner, pred[[x$predictor]])))
   }
   value <- switch(x$outcome,
     tst = , sol = paste0(sg, round(a), " min"),

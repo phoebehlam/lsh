@@ -28,7 +28,7 @@ rth_settings <- function() {
     clip_mad_k = 3,
     clip_vars  = c("tst", "se", "sol", "awakenings", "neg_pomp", "pos_pomp"),
     # Largest difference shown as an exact number in the "went together"
-    # sections. Bigger ones show as e.g. "60+ min": with ~2 weeks of days an
+    # sections. Bigger ones show as e.g. "+ >60 min": with ~2 weeks of days an
     # estimate that large isn't reliable. (Sleep efficiency is in % points;
     # mood caps apply to the events-and-mood chart.)
     link_cap = c(tst = 60, sol = 45, se = 30, awakenings = 10, neg_pomp = 50, pos_pomp = 50),

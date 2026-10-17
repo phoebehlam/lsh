@@ -178,7 +178,7 @@ plot_mood_change <- function(links, band = 5) {
   d$val[ok & abs(d$val) < .1] <- .1          # a sliver so a zero still shows
   d$txt <- mapply(function(e, s, cp) {
     if (s %in% c("too_few_days", "no_variation")) return("not enough days")
-    if (isTRUE(cp)) return(sprintf("%d+ pts %s", round(abs(e)), if (e > 0) "higher" else "lower"))
+    if (isTRUE(cp)) return(sprintf("%s >%d pts", if (e > 0) "+" else intToUtf8(8722), round(abs(e))))
     r <- round(e)
     if (r == 0) return("0 pts")
     sprintf("%s%d %s", if (r > 0) "+" else intToUtf8(8722), abs(r), if (abs(r) == 1) "pt" else "pts")
