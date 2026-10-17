@@ -32,14 +32,9 @@ render_rth_feedback <- function(id, age, night_sav, morning_sav, sleep_csv,
   if (!nrow(morning)) warning("No morning diaries found for ID ", id, call. = FALSE)
   if (!nrow(acti))    warning("No in-bed intervals found in ", basename(sleep_csv), call. = FALSE)
 
-  # Guard against silent mismatches (wrong file, or dates read in the wrong format).
-  diary_dates <- c(night$date, morning$night)
-  if (length(diary_dates) && nrow(acti) &&
-      !any(acti$night %in% diary_dates) && !any(acti$night %in% (diary_dates - 1))) {
-    stop(sprintf(paste0("The sleep file's nights (%s to %s) don't overlap the diary days (%s to %s) for ID %s. ",
-                        "Check that the sleep file belongs to this participant."),
-                 min(acti$night), max(acti$night), min(diary_dates), max(diary_dates), id), call. = FALSE)
-  }
+  # Guard against a sleep file from the wrong participant. These stop before
+  # anything is written, with a message meant for lab staff.
+  .rth_check_sleep_file(id, sleep_csv, acti, night, morning)
 
   rep <- compute_report(id, age, night, morning, acti, settings)
 
@@ -70,8 +65,21 @@ render_rth_feedback <- function(id, age, night_sav, morning_sav, sleep_csv,
                      col.names = !file.exists(log_file), append = file.exists(log_file))
 
   path <- file.path(normalizePath(out_dir), out_file)
+  n_both <- sum(!is.na(rep$days$stress_n) & !is.na(rep$days$tst))
   message("Report written: ", path,
-          if (rep$trigger$triggered) "  [resource box included - see staff log]" else "")
+          sprintf("\n  %d diary days, %d watch nights, %d days with both.",
+                  rep$n_diary, rep$n_nights, n_both),
+          if (rep$trigger$triggered) "\n  Resource box included - see staff log." else "")
+  if (n_both < settings$min_days && min(rep$n_diary, rep$n_nights) < settings$min_days) {
+    message(sprintf("  Note: fewer than %d diary days or watch nights, so the events-and-sleep section is not shown.",
+                    settings$min_days))
+  } else if (n_both < settings$min_days) {
+    warning(sprintf(paste0(
+      "ID %s: only %d day(s) matched between the diaries and the sleep file, so the ",
+      "events-and-sleep section is not shown (needs %d).\n",
+      "This is not common. Please check that you read in the correct sleep file for this participant, ",
+      "and look at staff/rth_pairing_%s.csv."), id, n_both, settings$min_days, id), call. = FALSE)
+  }
   invisible(path)
 }
 
@@ -85,6 +93,29 @@ render_rth_feedback <- function(id, age, night_sav, morning_sav, sleep_csv,
   p <- getOption("rth_feedback.home")
   if (is.null(p)) stop("Can't find the report template: install the lsh package or run dev/load_dev.R")
   p
+}
+
+# Stops with a plain-language message if the sleep file looks like it belongs
+# to someone else: a different ID in its name, or no dates in common with the
+# diaries.
+.rth_check_sleep_file <- function(id, sleep_csv, acti, night, morning) {
+  head <- sprintf("No report written for ID %s.\n", id)
+  tail <- "Please check that you read in the correct sleep file for this participant."
+  ids <- unique(stats::na.omit(c(.lead_id(sleep_csv), attr(acti, "file_ids"))))
+  if (length(ids) && !id %in% ids) {
+    stop(head, sprintf("The sleep file looks like it belongs to participant %s:\n  %s\n",
+                       paste(ids, collapse = "/"), basename(sleep_csv)), tail, call. = FALSE)
+  }
+  diary_dates <- c(night$date, morning$night)
+  if (length(diary_dates) && nrow(acti) &&
+      !any(acti$night %in% diary_dates) && !any(acti$night %in% (diary_dates - 1))) {
+    f <- function(x) format(range(x), "%b %d, %Y")
+    stop(head, "There are no matching days between the diaries and the sleep file:\n",
+         sprintf("  diaries:    %s to %s\n", f(diary_dates)[1], f(diary_dates)[2]),
+         sprintf("  sleep file: %s to %s\n", f(acti$night)[1], f(acti$night)[2]),
+         "This is not common. ", tail, call. = FALSE)
+  }
+  invisible(TRUE)
 }
 
 # Template helpers -------------------------------------------------------------

@@ -99,18 +99,27 @@ test_that("sleep dates re-saved by Excel (m/d/yy, AM/PM, ISO) are read correctly
   }
 })
 
-test_that("a sleep file that doesn't overlap the diaries stops with a clear message", {
+test_that("a sleep file from the wrong participant stops with a staff message", {
   ex <- file.path(.rth_home(), "example_data")
-  out <- file.path(tempdir(), "rth_overlap_test")
-  expect_error(
-    render_rth_feedback("1234", 16, file.path(ex, "sim_night_diary.sav"), file.path(ex, "sim_morning_diary.sav"),
-                        file.path(ex, "sim_sleep_5678.csv"), out_dir = out),
-    NA)  # 5678's sleep overlaps 1234's dates in the simulated data, so this renders
+  out <- file.path(tempdir(), "rth_wrongfile_test")
+  nd <- file.path(ex, "sim_night_diary.sav"); md <- file.path(ex, "sim_morning_diary.sav")
+  # Another teen's file (ID inside the file)
+  expect_error(render_rth_feedback("1234", 16, nd, md, file.path(ex, "sim_sleep_5678.csv"), out_dir = out),
+               "belongs to participant 5678")
+  # Another teen's file (ID in the file name only)
+  tmp_dir <- file.path(tempdir(), "rth_names"); dir.create(tmp_dir, showWarnings = FALSE)
+  x <- readr::read_csv(file.path(ex, "sim_sleep_1234.csv"), show_col_types = FALSE, name_repair = "minimal",
+                       col_types = readr::cols(.default = "c"))
+  x[["File Name"]] <- NULL
+  readr::write_csv(x, file.path(tmp_dir, "1171_coded_scored_sleep_consensus.csv"), na = "")
+  expect_error(render_rth_feedback("1234", 16, nd, md, file.path(tmp_dir, "1171_coded_scored_sleep_consensus.csv"),
+                                   out_dir = out), "belongs to participant 1171")
+  # Right ID, but no dates in common with the diaries
   tmp <- tempfile(fileext = ".csv")
-  x <- readLines(file.path(ex, "sim_sleep_1234.csv"))
-  writeLines(gsub("/2026", "/2025", x), tmp)
-  expect_error(
-    render_rth_feedback("1234", 16, file.path(ex, "sim_night_diary.sav"), file.path(ex, "sim_morning_diary.sav"),
-                        tmp, out_dir = out),
-    "don't overlap")
+  writeLines(gsub("/2026", "/2025", readLines(file.path(ex, "sim_sleep_1234.csv"))), tmp)
+  expect_error(render_rth_feedback("1234", 16, nd, md, tmp, out_dir = out), "no matching days")
+  # Correct file renders, with no warning
+  expect_no_warning(render_rth_feedback("1234", 16, nd, md, file.path(ex, "sim_sleep_1234.csv"), out_dir = out))
+  expect_equal(.lead_id(c("1171_coded.csv", "/a/b/0042-x.csv", "camilletest.csv", "12345_x.csv")),
+               c("1171", "0042", NA, NA))
 })

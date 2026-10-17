@@ -235,7 +235,18 @@ read_actigraphy <- function(path) {
   out$midpoint <- out$onset + (out$offset - out$onset) / 2
 
   # If a night has more than one in-bed interval, keep the longest.
-  out |>
+  out <- out |>
     dplyr::arrange(night, dplyr::desc(tib)) |>
     dplyr::distinct(night, .keep_all = TRUE)
+  # Participant IDs named inside the file (Motionlogger "File Name", e.g.
+  # 1234_09-14-2026.ami), used to catch a sleep file from the wrong teen.
+  fn <- if ("File Name" %in% names(raw)) as.character(raw[["File Name"]]) else character()
+  attr(out, "file_ids") <- unique(stats::na.omit(.lead_id(fn)))
+  out
+}
+
+# Leading 4-digit study ID of a file name ("1171_coded_scored_sleep.csv" -> "1171").
+.lead_id <- function(x) {
+  x <- basename(x)
+  ifelse(grepl("^[0-9]{4}([^0-9]|$)", x), substr(x, 1, 4), NA_character_)
 }
