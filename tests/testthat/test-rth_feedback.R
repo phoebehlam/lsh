@@ -76,3 +76,41 @@ test_that("pairing table flags watch-off nights and late diaries are re-dated", 
   late <- pt[!is.na(pt$night_diary_started) & substr(pt$night_diary_started, 12, 13) < "12", ]
   expect_true(all(as.Date(substr(late$night_diary_started, 1, 10)) - late$date == 1))
 })
+
+test_that("sleep dates re-saved by Excel (m/d/yy, AM/PM, ISO) are read correctly", {
+  f <- file.path(.rth_home(), "example_data", "sim_sleep_1234.csv")
+  ref <- read_actigraphy(f)
+  raw <- readr::read_csv(f, show_col_types = FALSE, col_types = readr::cols(.default = "c"), name_repair = "minimal")
+  dcols <- grep("Date$", names(raw)); tcols <- grep("Time$", names(raw))
+  tcols <- tcols[!grepl("Total Time|Sleep Time|Wake Time", names(raw)[tcols])]
+  reformat <- function(fd, ft) {
+    x <- raw
+    for (j in dcols) x[[j]] <- fd(as.Date(x[[j]], "%m/%d/%Y"))
+    for (j in tcols) x[[j]] <- ft(x[[j]])
+    tmp <- tempfile(fileext = ".csv"); readr::write_csv(x, tmp, na = ""); tmp
+  }
+  short <- function(d) ifelse(is.na(d), NA, sprintf("%d/%d/%s", as.integer(format(d, "%m")), as.integer(format(d, "%d")), format(d, "%y")))
+  ampm  <- function(t) ifelse(is.na(t), NA, format(as.POSIXct(paste("2000-01-01", t), tz = "UTC"), "%I:%M:%S %p"))
+  for (tmp in c(reformat(short, identity), reformat(short, ampm), reformat(function(d) format(d), identity))) {
+    got <- read_actigraphy(tmp)
+    expect_equal(got$night, ref$night)
+    expect_equal(got$bed, ref$bed)
+    expect_equal(got$tst, ref$tst)
+  }
+})
+
+test_that("a sleep file that doesn't overlap the diaries stops with a clear message", {
+  ex <- file.path(.rth_home(), "example_data")
+  out <- file.path(tempdir(), "rth_overlap_test")
+  expect_error(
+    render_rth_feedback("1234", 16, file.path(ex, "sim_night_diary.sav"), file.path(ex, "sim_morning_diary.sav"),
+                        file.path(ex, "sim_sleep_5678.csv"), out_dir = out),
+    NA)  # 5678's sleep overlaps 1234's dates in the simulated data, so this renders
+  tmp <- tempfile(fileext = ".csv")
+  x <- readLines(file.path(ex, "sim_sleep_1234.csv"))
+  writeLines(gsub("/2026", "/2025", x), tmp)
+  expect_error(
+    render_rth_feedback("1234", 16, file.path(ex, "sim_night_diary.sav"), file.path(ex, "sim_morning_diary.sav"),
+                        tmp, out_dir = out),
+    "don't overlap")
+})

@@ -32,6 +32,15 @@ render_rth_feedback <- function(id, age, night_sav, morning_sav, sleep_csv,
   if (!nrow(morning)) warning("No morning diaries found for ID ", id, call. = FALSE)
   if (!nrow(acti))    warning("No in-bed intervals found in ", basename(sleep_csv), call. = FALSE)
 
+  # Guard against silent mismatches (wrong file, or dates read in the wrong format).
+  diary_dates <- c(night$date, morning$night)
+  if (length(diary_dates) && nrow(acti) &&
+      !any(acti$night %in% diary_dates) && !any(acti$night %in% (diary_dates - 1))) {
+    stop(sprintf(paste0("The sleep file's nights (%s to %s) don't overlap the diary days (%s to %s) for ID %s. ",
+                        "Check that the sleep file belongs to this participant."),
+                 min(acti$night), max(acti$night), min(diary_dates), max(diary_dates), id), call. = FALSE)
+  }
+
   rep <- compute_report(id, age, night, morning, acti, settings)
 
   # Render from a temporary copy so nothing is written into the package folder.

@@ -182,13 +182,34 @@ read_morning_diary <- function(path, id, drop_previews = TRUE) {
 
 #' Read a Motionlogger in-bed interval export
 #' @keywords internal
+# Motionlogger exports write dates as 09/14/2026, but a CSV re-saved in Excel
+# becomes 9/14/26 (and sometimes 2026-09-14 or 11:41 PM). Try each format and
+# keep the first one that parses every value into a plausible year; a 4-digit
+# year format alone would read "26" as the year 0026.
+.parse_acti_dt <- function(d, t) {
+  x <- trimws(paste(as.character(d), as.character(t)))
+  x[is.na(d) | is.na(t)] <- NA
+  ok <- !is.na(x)
+  if (!any(ok)) return(as.POSIXct(x, tz = "UTC"))
+  fmts <- c("%m/%d/%Y %H:%M:%S", "%m/%d/%Y %H:%M", "%m/%d/%y %H:%M:%S", "%m/%d/%y %H:%M",
+            "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M",
+            "%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y %I:%M %p", "%m/%d/%y %I:%M:%S %p", "%m/%d/%y %I:%M %p")
+  for (f in fmts) {
+    out <- as.POSIXct(x, format = f, tz = "UTC")
+    yr <- as.integer(format(out[ok], "%Y"))
+    if (!anyNA(out[ok]) && all(yr >= 2000 & yr <= 2100)) return(out)
+  }
+  stop("Can't read the dates/times in the sleep file (e.g. '", x[ok][1],
+       "'). Expected month/day/year with a time, like 09/14/2026 22:24:10.", call. = FALSE)
+}
+
 read_actigraphy <- function(path) {
   raw <- readr::read_csv(path, show_col_types = FALSE, name_repair = "minimal")
   raw <- raw[!is.na(raw[["Start Date"]]), , drop = FALSE]
   if ("Interval Channel" %in% names(raw)) {
     raw <- raw[tolower(raw[["Interval Channel"]]) == "inbed", , drop = FALSE]
   }
-  dt <- function(d, t) as.POSIXct(paste(d, t), format = "%m/%d/%Y %H:%M:%S", tz = "UTC")
+  dt <- .parse_acti_dt
   start  <- dt(raw[["Start Date"]], raw[["Start Time"]])
   end    <- dt(raw[["End Date"]], raw[["End Time"]])
   onset  <- dt(raw[["First Onset Date"]], raw[["First Onset Time"]])
