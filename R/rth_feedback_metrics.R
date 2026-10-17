@@ -296,6 +296,8 @@ compute_report <- function(id, age, night_diary, morning_diary, actigraphy,
 #' One row per date: when each diary was started, which date it was counted
 #' for, whether there were duplicate entries, and whether watch data exist.
 #' Written next to the report so staff can verify the day/night matching.
+#' @param days    The day-level table from build_days().
+#' @param clipped Values pulled in before the links (from clip_days()), listed per date.
 #' @keywords internal
 pairing_table <- function(days, clipped = NULL) {
   clip_txt <- rep("", nrow(days))

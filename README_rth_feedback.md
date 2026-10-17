@@ -32,7 +32,7 @@ render_rth_feedback(
 
 Writes:
 
-- `feedback_reports/rth_feedback_1234.html` – the teen's report (one self-contained file)
+- `feedback_reports/RiseToHealth_YourDailyPatterns_1234.html` – the teen's report (one self-contained file)
 - `feedback_reports/staff/rth_pairing_1234.csv` – staff-only day/night pairing check
 - `feedback_reports/staff/rth_feedback_staff_log.csv` – one row per report, incl. whether the resource box was shown
 

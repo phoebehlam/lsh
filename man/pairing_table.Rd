@@ -4,7 +4,12 @@
 \alias{pairing_table}
 \title{Day-by-day pairing check for staff}
 \usage{
-pairing_table(days)
+pairing_table(days, clipped = NULL)
+}
+\arguments{
+\item{days}{The day-level table from build_days().}
+
+\item{clipped}{Values pulled in before the links (from clip_days()), listed per date.}
 }
 \description{
 One row per date: when each diary was started, which date it was counted

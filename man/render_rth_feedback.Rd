@@ -14,7 +14,8 @@ render_rth_feedback(
   log_file = file.path(out_dir, "staff", "rth_feedback_staff_log.csv"),
   contact_email = "risetohealth@cmu.edu",
   settings = rth_settings(),
-  drop_previews = TRUE
+  drop_previews = TRUE,
+  file_name = sprintf("RiseToHealth_YourDailyPatterns_\%s.html", id)
 )
 }
 \arguments{
@@ -37,6 +38,9 @@ render_rth_feedback(
 \item{settings}{rth_settings() list; change values there, not in the code.}
 
 \item{drop_previews}{Drop Qualtrics preview/test responses (Status != 0).}
+
+\item{file_name}{Name of the teen's report file. Default:
+\code{RiseToHealth_YourDailyPatterns_<id>.html}.}
 }
 \value{
 Path to the HTML report (invisibly). Also writes a staff-only

@@ -12,6 +12,8 @@
 #' @param contact_email Study contact shown in the report.
 #' @param settings    rth_settings() list; change values there, not in the code.
 #' @param drop_previews Drop Qualtrics preview/test responses (Status != 0).
+#' @param file_name   Name of the teen's report file. Default:
+#'   \code{RiseToHealth_YourDailyPatterns_<id>.html}.
 #' @return Path to the HTML report (invisibly). Also writes a staff-only
 #'   pairing check (\code{staff/rth_pairing_<id>.csv}) and appends to the staff log.
 #' @export
@@ -20,7 +22,8 @@ render_rth_feedback <- function(id, age, night_sav, morning_sav, sleep_csv,
                                 log_file = file.path(out_dir, "staff", "rth_feedback_staff_log.csv"),
                                 contact_email = "risetohealth@cmu.edu",
                                 settings = rth_settings(),
-                                drop_previews = TRUE) {
+                                drop_previews = TRUE,
+                                file_name = sprintf("RiseToHealth_YourDailyPatterns_%s.html", id)) {
   id <- as.character(id)
   stopifnot(grepl("^[0-9]{4}$", id), is.numeric(age), length(age) == 1)
   for (f in c(night_sav, morning_sav, sleep_csv)) if (!file.exists(f)) stop("File not found: ", f)
@@ -45,7 +48,7 @@ render_rth_feedback <- function(id, age, night_sav, morning_sav, sleep_csv,
   file.copy(file.path(home, c("feedback_template.Rmd", "report.css", "rth_logo.png")), work)
 
   dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
-  out_file <- sprintf("rth_feedback_%s.html", id)
+  out_file <- if (grepl("\\.html?$", file_name, ignore.case = TRUE)) file_name else paste0(file_name, ".html")
   rmarkdown::render(file.path(work, "feedback_template.Rmd"),
                     output_file = out_file, output_dir = normalizePath(out_dir),
                     params = list(report = rep, contact = contact_email),
