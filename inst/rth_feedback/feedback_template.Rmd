@@ -51,10 +51,10 @@ tst_card <- if (has_sleep) fmt_hm(sl$tst) else "&mdash;"
 bed_card <- if (has_sleep) tm$mean_clock[tm$var == "bed"] else "&mdash;"
 cat(card("days", "Your events", fmt_num(dsm$stress_n), "unpleasant events a day"))
 cat(card("mood", "Your mood", if (has_diary) sprintf("%s/100", round(dsm$pos_pomp)) else "&mdash;", "average positive mood"))
+cat(card("mood-links", "Events &amp; mood", sprintf("%d days", sum(!is.na(d$stress_n) & !is.na(d$neg_pomp))), "with a diary"))
 cat(card("sleep", "Sleep", tst_card, "average sleep a night"))
 cat(card("sleep", "Sleep timing", bed_card, "average bedtime"))
 cat(card("sleep-links", "Events &amp; sleep", sprintf("%d days", sum(!is.na(d$stress_n) & !is.na(d$tst))), "with a diary and sleep data"))
-cat(card("mood-links", "Events &amp; mood", sprintf("%d days", sum(!is.na(d$stress_n) & !is.na(d$neg_pomp))), "with a diary"))
 ```
 </nav>
 
@@ -75,6 +75,25 @@ if (!has_diary) {
   if (isTRUE(r$trigger$triggered)) {
     cat('<div class="support-box"><p><strong>You told us that many of your days felt hard.</strong> That\'s worth paying attention to, and you don\'t have to handle it alone. Talking with someone you trust can help, and there are free, confidential resources you can reach any time.</p><p><a href="#support">See the support resources at the end of this report</a>.</p></div>')
   }
+}
+```
+</section>
+
+<section id="mood-links">
+<h2>How your events and mood went together</h2>
+```{r}
+ml <- r$mood_links
+n_pair_mood <- sum(!is.na(d$stress_n) & !is.na(d$neg_pomp))
+if (n_pair_mood < s$min_days) {
+  note(sprintf("We need at least %d diary days to look at these patterns, and we have %d from you. Thanks for the ones you did complete!",
+               s$min_days, n_pair_mood))
+}
+ttl <- c(stress_n = "Unpleasant events", pos_n = "Positive events", help_n = "Helping others")
+if (n_pair_mood >= s$min_days) {
+  cat("<p>Each bar shows how your mood that day tended to differ on days with <strong>one more</strong> event. Bars inside the grey zone (less than 5 points out of 100 either way) we'd call &ldquo;about the same.&rdquo;</p>")
+  cat(img_tag(plot_mood_change(ml, s$same_band[["neg_pomp"]]), height = 3.4,
+              alt = "Change in mood on days with one more event"))
+  cat('<div class="callout"><p><strong>What this can and can&rsquo;t tell you.</strong> These bars show what tended to happen <em>on the same day</em>, not what caused what, or which came first. Take helping others: if your negative mood tended to be lower on days you helped more, it could be that helping lifted your mood, that you were more likely to help when you were already in a good mood, or that something else about those days, like time with friends, made both more likely.</p></div>')
 }
 ```
 </section>
@@ -114,7 +133,7 @@ if (!has_sleep) {
   cat(img_tag(plot_sleep_window_v(d, s$clock_anchor_h), height = 1.45, alt = "Time in bed and asleep each night"))
   cat(refs_html(c("Sleep regularity and mental health in teens (Castiglione-Fontanellaz et al., 2023)",
                   "https://doi.org/10.1111/jsr.13865")))
-  cat('<p class="bridge">So what goes along with a longer or shorter night, or a calmer or harder day? The next two sections look at how your days, your mood, and your sleep moved together.</p>')
+  cat('<p class="bridge">So what goes along with a longer or shorter night, or a calmer or harder day? The next section looks at how your events and that night&rsquo;s sleep moved together.</p>')
 }
 ```
 </section>
@@ -130,25 +149,6 @@ if (!enough) {
                s$min_days, n_pair_sleep))
 }
 if (enough) cat(events_sleep_html(r))
-```
-</section>
-
-<section id="mood-links">
-<h2>How your events and mood went together</h2>
-```{r}
-ml <- r$mood_links
-n_pair_mood <- sum(!is.na(d$stress_n) & !is.na(d$neg_pomp))
-if (n_pair_mood < s$min_days) {
-  note(sprintf("We need at least %d diary days to look at these patterns, and we have %d from you. Thanks for the ones you did complete!",
-               s$min_days, n_pair_mood))
-}
-ttl <- c(stress_n = "Unpleasant events", pos_n = "Positive events", help_n = "Helping others")
-if (n_pair_mood >= s$min_days) {
-  cat("<p>Each bar shows how your mood that day tended to differ on days with <strong>one more</strong> event. Bars inside the grey zone (less than 5 points out of 100 either way) we'd call &ldquo;about the same.&rdquo;</p>")
-  cat(img_tag(plot_mood_change(ml, s$same_band[["neg_pomp"]]), height = 3.4,
-              alt = "Change in mood on days with one more event"))
-  cat('<div class="callout"><p><strong>What this can and can&rsquo;t tell you.</strong> These bars show what tended to happen <em>on the same day</em>, not what caused what, or which came first. Take helping others: if your negative mood tended to be lower on days you helped more, it could be that helping lifted your mood, that you were more likely to help when you were already in a good mood, or that something else about those days, like time with friends, made both more likely.</p></div>')
-}
 ```
 </section>
 
