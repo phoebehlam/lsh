@@ -203,7 +203,7 @@ plot_mood_change <- function(links, band = 5) {
     theme_rth() +
     ggplot2::theme(panel.grid.major.y = ggplot2::element_blank(),
                    panel.grid.major.x = ggplot2::element_line(colour = rth_pal$grid, linewidth = .3),
-                   strip.text = ggplot2::element_text(face = "bold", colour = rth_pal$ink))
+                   strip.text = ggplot2::element_text(face = "bold", colour = rth_pal$ink, size = 7))
 }
 
 #' Sleep window per night as vertical bars: dates across, clock time down

@@ -63,9 +63,15 @@ render_rth_feedback <- function(id, age, night_sav, morning_sav, sleep_csv,
                     diary_days = rep$n_diary, watch_nights = rep$n_nights,
                     neg_mood_days = rep$trigger$n_days,
                     share_neg_mood_high = round(rep$trigger$share_high, 2),
-                    resource_box = rep$trigger$triggered)
-  utils::write.table(row, log_file, sep = ",", row.names = FALSE,
-                     col.names = !file.exists(log_file), append = file.exists(log_file))
+                    resource_box = rep$trigger$triggered,
+                    redo_offer = sum(!is.na(rep$days$stress_n) & !is.na(rep$days$tst)) < settings$min_days)
+  # Re-write the log with all columns, so logs started before a column was
+  # added (e.g. redo_offer) stay lined up; old rows get blanks there.
+  if (file.exists(log_file)) {
+    old <- utils::read.csv(log_file, colClasses = "character", check.names = FALSE)
+    row <- dplyr::bind_rows(old, dplyr::mutate(row, dplyr::across(dplyr::everything(), as.character)))
+  }
+  utils::write.csv(row, log_file, row.names = FALSE, na = "")
 
   path <- file.path(normalizePath(out_dir), out_file)
   n_both <- sum(!is.na(rep$days$stress_n) & !is.na(rep$days$tst))
@@ -135,10 +141,12 @@ link_value <- function(o, e, capped = FALSE) {
       awakenings = sprintf("%s &gt;%s times", sg, format(a)),
       sprintf("%s &gt;%d pts", sg, round(a))))
   }
+  # No sign when the difference rounds to zero ("0 min", not "-0 min")
+  if ((o == "awakenings" && round(a, 1) == 0) || (o != "awakenings" && round(a) == 0)) sg <- ""
   switch(o,
     tst = , sol = paste0(sg, round(a), " min"),
     se = paste0(sg, round(a), "%"),
-    awakenings = paste0(sg, format(round(a, 1), nsmall = 1), if (round(a, 1) == 1) " time" else " times"),
+    awakenings = if (sg == "") "0 times" else paste0(sg, format(round(a, 1), nsmall = 1), if (round(a, 1) == 1) " time" else " times"),
     paste0(sg, round(a), if (round(a) == 1) " pt" else " pts"))
 }
 
@@ -188,6 +196,30 @@ link_highlight <- function(links, s, kind = c("sleep", "mood"), n_days = NA) {
   list(value = value, sub = sprintf("%s %s %s", outc[[x$outcome]], joiner, pred[[x$predictor]]))
 }
 
+#' "Your events" overview card: positive events or helping a day, whichever
+#' was more common (positive events if tied).
+#' @keywords internal
+events_card <- function(dsm) {
+  p <- dsm$pos_n; h <- dsm$help_n
+  if (is.null(p) || is.na(p)) p <- NA_real_
+  if (is.null(h) || is.na(h)) h <- NA_real_
+  if (is.na(p) && is.na(h)) return(list(value = "&mdash;", sub = "events a day"))
+  if (is.na(h) || (!is.na(p) && p >= h)) list(value = fmt_num(p), sub = "positive events a day")
+  else list(value = fmt_num(h), sub = "times you helped others a day")
+}
+
+#' Offer of another paid round of daily assessments, shown when there are too
+#' few diary + watch days for the events-and-sleep section.
+#' @keywords internal
+redo_offer_html <- function(contact = "risetohealth@cmu.edu") {
+  sprintf(paste0('<div class="callout"><p><strong>Want to see this part of your report?</strong> ',
+                 'If you&rsquo;d like, we&rsquo;re happy to set up another round of paid daily assessments: ',
+                 'the morning and night diaries, wearing the sleep watch, and photos of your meals. ',
+                 'You can earn up to <strong>$40</strong>: $25 for completing at least 12 of the 15 days, ',
+                 'plus a $15 bonus for completing all 15. Just email us at <a href="mailto:%1$s">%1$s</a> to get started.</p></div>'),
+          contact)
+}
+
 # Template helpers -------------------------------------------------------------
 
 # Embed a ggplot as a base64 PNG so the HTML stays a single file.
@@ -195,7 +227,7 @@ link_highlight <- function(links, s, kind = c("sleep", "mood"), n_days = NA) {
 img_tag <- function(p, height = 3, width = 4.4, alt = "") {
   if (is.null(p)) return("")
   f <- tempfile(fileext = ".png")
-  ggplot2::ggsave(f, p, width = width, height = height, dpi = 200, bg = "white")
+  ggplot2::ggsave(f, p, width = width, height = height, dpi = 300, bg = "white")
   sprintf('<img class="chart" src="%s" alt="%s">', knitr::image_uri(f), alt)
 }
 
@@ -235,7 +267,7 @@ glance_html <- function(r) {
   rng <- function(v, f) sprintf("Range across nights: %s to %s", f(get(v, "min")), f(get(v, "max")))
   paste0(
     '<p class="g-legend"><span class="lg lg-avg"></span>your average <span class="lg lg-range"></span>your range across nights',
-    '<span class="lg lg-ref"></span>NSF reference range</p>',
+    '<span class="lg lg-ref"></span>NSF reference range for good or typical sleep</p>',
     row("Sleep time", "time the watch recorded you as asleep", fmt_hm(get("tst", "mean")),
         rng("tst", fmt_hm), "tst", h_lo, h_hi, div = 60,
         ref = if (!is.null(g)) c(g$lo, g$hi), ref_txt = if (!is.null(g)) sprintf("Recommended (NSF): %d&ndash;%d h", g$lo, g$hi) else ""),
@@ -271,8 +303,8 @@ events_sleep_html <- function(r) {
   preds <- c(stress_n = "On days with 1 more unpleasant event",
              pos_n    = "On days with 1 more positive event",
              help_n   = "On days you helped others 1 more time",
-             neg_pomp = "On days your negative mood was 25 points higher",
-             pos_pomp = "On days your positive mood was 25 points higher")
+             neg_pomp = sprintf("On days your negative mood was %d points higher", s$pomp_unit),
+             pos_pomp = sprintf("On days your positive mood was %d points higher", s$pomp_unit))
   short <- c(stress_n = "unpleasant events", pos_n = "positive events", help_n = "helping others",
              neg_pomp = "negative mood", pos_pomp = "positive mood")
   col <- c(stress_n = rth_pal$stress, pos_n = rth_pal$positive, help_n = rth_pal$help,
@@ -311,14 +343,26 @@ events_sleep_html <- function(r) {
 
   out <- ""
   if (!nrow(shown)) {
-    out <- paste0(out, '<div class="callout"><p><strong>Your sleep looked about the same no matter what kind of day you had.</strong> On days with more unpleasant or positive events, more helping, or higher or lower mood, your sleep that night stayed about the same. That&rsquo;s a pattern too: for you, these two weeks of daytime ups and downs didn&rsquo;t show up much in your sleep.</p></div>')
+    # Nothing stood out: still show the mood cards so the teen can see their
+    # bars sitting inside "about the same", then say so for every comparison.
+    mood_cards <- same[same$predictor %in% c("neg_pomp", "pos_pomp"), ]
     k <- s$same_show_top
-    if (!is.null(k) && k > 0 && nrow(same)) {
+    if (nrow(mood_cards)) {
+      out <- paste0('<p>Each card compares a day with the sleep you got <em>that night</em>. ', how_to_read, '</p>',
+                    '<p>None of your comparisons stood out, so here are the ones for your mood. Notice that every bar stays inside the grey zone.</p>',
+                    cards(mood_cards))
+    } else if (!is.null(k) && k > 0 && nrow(same)) {
       same$rel <- abs(same$est) / unlist(s$same_band[same$outcome])
       top <- same[order(-same$rel), ][seq_len(min(k, nrow(same))), ]
       top <- top[order(match(top$predictor, names(preds))), ]
       out <- paste0(out, sprintf('<p>Here are your %d largest differences, so you can see what &ldquo;about the same&rdquo; looks like. %s Notice that all of these bars stay inside the grey zone.</p>',
                                  nrow(top), how_to_read), cards(top))
+    }
+    if (nrow(same)) {
+      chips <- paste(sprintf('<span class="chip">%s &rarr; %s</span>', short[same$predictor],
+                             tolower(outs[same$outcome])), collapse = "")
+      out <- paste0(out, sprintf('<p><strong>Your sleep stayed about the same regardless of your events or mood</strong>, for all %d comparisons%s.</p><details><summary>See which ones</summary><p class="chips">%s</p></details>',
+                                 nrow(same), if (nrow(same) < nrow(sk)) " we could look at" else "", chips))
     }
   } else {
     out <- paste0('<p>Each card compares a day with the sleep you got <em>that night</em>. We only show the ones that stood out. ', how_to_read, '</p>', cards(shown),
@@ -360,7 +404,7 @@ events_glance_html <- function(r) {
   }
   paste0(
     '<p class="g-legend"><span class="lg lg-avg"></span>your average <span class="lg lg-range"></span>your range across days</p>',
-    row("stress_n", "Unpleasant events", "like arguments, lots of schoolwork, or being left out", rth_pal$stress),
+    row("stress_n", "Unpleasant events", "like arguments or lots of schoolwork", rth_pal$stress),
     row("pos_n", "Positive events", "like quality time or feeling cared for by family or friends", rth_pal$sleep),
     row("help_n", "Times you helped others", "like helping with chores, giving advice, or standing up for someone", rth_pal$help))
 }
@@ -375,10 +419,8 @@ sources_html <- function(dom) {
   rows <- vapply(names(dom), function(k) sprintf(
     '<div class="s-row"><span class="s-name">%s</span><span class="s-bar"><span style="width:%.1f%%"></span></span><span class="s-n">%d</span></div>',
     nm[[k]], dom[[k]] / max(dom) * 100, dom[[k]]), "")
-  # With only a few events, "most of them" isn't meaningful, so skip it.
-  most <- if (tot >= 5) sprintf(" Most of them involved <strong>%s</strong>.", tolower(nm[[names(dom)[1]]])) else ""
-  sprintf('<h4 class="sub">Where your unpleasant events came from</h4><p>Across all your diaries you reported <strong>%d unpleasant %s</strong>.%s</p><div class="sources">%s</div>',
-          tot, if (tot == 1) "event" else "events", most, paste(rows, collapse = ""))
+  sprintf('<h4 class="sub">Where your unpleasant events came from</h4><p>Across all your diaries you reported <strong>%d unpleasant %s</strong>.</p><div class="sources">%s</div>',
+          tot, if (tot == 1) "event" else "events", paste(rows, collapse = ""))
 }
 
 #' Bedtime and wake-up time rows for the "at a glance" block, on a clock track

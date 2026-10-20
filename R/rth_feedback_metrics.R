@@ -9,7 +9,7 @@ rth_settings <- function() {
   list(
     min_days       = 7,     # minimum paired days for a slope / correlation
     min_distinct_x = 3,     # predictor must take at least this many values
-    pomp_unit      = 25,    # effect unit for 0-100 scales
+    pomp_unit      = 10,    # effect unit for 0-100 scales (mood -> sleep)
     count_unit     = 1,     # effect unit for event counts
     clock_anchor_h = 18,    # clock times averaged on a 6 PM - 6 PM day
     # "About the same" bands: differences smaller than these are described as
@@ -49,8 +49,8 @@ rth_vars <- function() {
       "stress_n", "Unpleasant events",  "reported one more unpleasant event",              "count",
       "pos_n",    "Positive events",   "reported one more positive event",               "count",
       "help_n",   "Helping others",    "helped someone one more time",                   "count",
-      "neg_pomp", "Negative mood",     "rated your negative mood 25 points higher (out of 100)", "pomp",
-      "pos_pomp", "Positive mood",     "rated your positive mood 25 points higher (out of 100)", "pomp"
+      "neg_pomp", "Negative mood",     "rated your negative mood 10 points higher (out of 100)", "pomp",
+      "pos_pomp", "Positive mood",     "rated your positive mood 10 points higher (out of 100)", "pomp"
     ),
     sleep_outcomes = tibble::tribble(
       ~var,          ~short,            ~unit,

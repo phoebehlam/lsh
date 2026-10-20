@@ -162,7 +162,7 @@ test_that("overview cards show the standout link", {
   expect_equal(h$sub, "sleep after days with 1 more unpleasant event")
   l2 <- rbind(l, tibble::tibble(predictor = "pos_pomp", outcome = "awakenings", n = 14, est = -2.5, status = "shown"))
   expect_equal(link_highlight(l2, s, "sleep")$value, "&minus;24 min")     # events first
-  expect_equal(link_highlight(l2[3, ], s, "sleep")$sub, "wake-ups after days with 25-pt higher positive mood")
+  expect_equal(link_highlight(l2[3, ], s, "sleep")$sub, "wake-ups after days with 10-pt higher positive mood")
   l$status <- "about_same"
   expect_equal(link_highlight(l, s, "sleep")$value, "About the same")
   l$status <- "too_few_days"
@@ -189,6 +189,9 @@ test_that("very large differences are shown capped (e.g. + >60 min), efficiency 
   expect_equal(link_value("se", 30, TRUE), "+ &gt;30%")
   expect_equal(link_value("awakenings", 10, TRUE), "+ &gt;10 times")
   expect_equal(link_value("tst", 24), "+24 min")
+  expect_equal(link_value("se", -0.3), "0%")
+  expect_equal(link_value("sol", 0.2), "0 min")
+  expect_equal(link_value("awakenings", 0.04), "0 times")
   h <- link_highlight(lt, s, "sleep")
   expect_equal(h$value, "+ &gt;60 min")
   expect_equal(h$sub, "sleep after days with 1 more unpleasant event")
@@ -196,9 +199,8 @@ test_that("very large differences are shown capped (e.g. + >60 min), efficiency 
   expect_false(link_table(d, "stress_n", "tst", s2)$capped)
 })
 
-test_that("'Most of them involved' only appears with 5 or more unpleasant events", {
-  expect_match(sources_html(c(family = 3, friends = 1, school = 1, unfair = 0)), "Most of them involved")
-  expect_false(grepl("Most of them", sources_html(c(family = 2, friends = 1, school = 1, unfair = 0))))
+test_that("unpleasant-events summary has no 'Most of them' line", {
+  expect_false(grepl("Most of them", sources_html(c(family = 3, friends = 1, school = 1, unfair = 0))))
   expect_match(sources_html(c(family = 1, friends = 0, school = 0, unfair = 0)), "1 unpleasant event<")
 })
 
@@ -210,4 +212,43 @@ test_that("the teen's report gets a participant-friendly file name", {
                                             file.path(ex, "sim_sleep_1234.csv"), out_dir = out))
   expect_equal(basename(p), "RiseToHealth_YourDailyPatterns_1234.html")
   expect_true(file.exists(p))
+})
+
+test_that("Your events card shows positive events or helping, whichever is higher", {
+  expect_equal(events_card(list(pos_n = 2.1, help_n = 1.4))$sub, "positive events a day")
+  expect_equal(events_card(list(pos_n = 0.8, help_n = 1.4)), list(value = "1.4", sub = "times you helped others a day"))
+  expect_equal(events_card(list(pos_n = 1, help_n = 1))$sub, "positive events a day")
+  expect_equal(events_card(list(pos_n = NA, help_n = NA))$value, "&mdash;")
+})
+
+test_that("all-'about the same' sleep section still shows the mood cards", {
+  r <- list(settings = rth_settings())
+  grid <- expand.grid(predictor = c("stress_n", "pos_n", "help_n", "neg_pomp", "pos_pomp"),
+                      outcome = c("tst", "se", "sol", "awakenings"), stringsAsFactors = FALSE)
+  r$sleep_links <- tibble::tibble(grid, n = 14, est = 0.5, status = "about_same", est_show = 0.5, capped = FALSE)
+  h <- events_sleep_html(r)
+  expect_match(h, "On days your negative mood was 10 points higher")
+  expect_match(h, "On days your positive mood was 10 points higher")
+  expect_false(grepl("1 more unpleasant event&hellip;", h))
+  expect_match(h, "regardless of your events or mood</strong>, for all 20 comparisons.")
+  expect_match(h, "See which ones")
+})
+
+test_that("too few paired days: redo offer shown, flagged in the staff log; old logs stay aligned", {
+  ex <- file.path(.rth_home(), "example_data")
+  out <- file.path(tempdir(), "rth_redo_test"); unlink(out, recursive = TRUE)
+  dir.create(file.path(out, "staff"), recursive = TRUE)
+  # an old-format log (no redo_offer column)
+  writeLines(c('"id","rendered","diary_days","watch_nights","neg_mood_days","share_neg_mood_high","resource_box"',
+               '"0001","2026-10-01 10:00",15,14,15,0.1,FALSE'), file.path(out, "staff", "rth_feedback_staff_log.csv"))
+  p <- suppressMessages(render_rth_feedback("5678", 18, file.path(ex, "sim_night_diary.sav"), file.path(ex, "sim_morning_diary.sav"),
+                                            file.path(ex, "sim_sleep_5678.csv"), out_dir = out))
+  h <- paste(readLines(p, warn = FALSE), collapse = " ")
+  expect_match(h, "and we have [0-9] from you")
+  expect_match(h, "up to <strong>\\$40</strong>")
+  lg <- utils::read.csv(file.path(out, "staff", "rth_feedback_staff_log.csv"), colClasses = "character")
+  expect_equal(nrow(lg), 2)
+  expect_equal(lg$id, c("0001", "5678"))
+  expect_equal(lg$redo_offer, c("", "TRUE"))
+  expect_equal(lg$resource_box[1], "FALSE")
 })

@@ -49,7 +49,8 @@ cat(sprintf('<p class="dates">%s to %s &middot; %d diary days &middot; %d nights
 ```{r}
 tst_card <- if (has_sleep) fmt_hm(sl$tst) else "&mdash;"
 bed_card <- if (has_sleep) tm$mean_clock[tm$var == "bed"] else "&mdash;"
-cat(card("days", "Your events", fmt_num(dsm$stress_n), "unpleasant events a day"))
+ev <- events_card(dsm)
+cat(card("days", "Your events", ev$value, ev$sub))
 cat(card("mood", "Your mood", if (has_diary) sprintf("%s/100", round(dsm$pos_pomp)) else "&mdash;", "average positive mood"))
 hm <- link_highlight(r$mood_links, s, "mood")
 cat(card("mood-links", "Events &amp; mood", hm$value, hm$sub))
@@ -127,7 +128,7 @@ if (!has_sleep) {
   sd_tst <- r$sleep$sd[r$sleep$var == "tst"]
   cat(sprintf('<p>Sleep changes from night to night for everyone. Your sleep time usually landed within about <strong>%s</strong> of your average. This is called <em>sleep variability</em>: the smaller it is, the more regular your sleep.</p>',
               fmt_hm(sd_tst)))
-  cat('<p class="hint">Dots are nights, the dashed line is your average, and shaded bands are the NSF reference ranges from above.</p>')
+  cat('<p class="hint">Dots are nights, the dashed line is your average, and shaded bands are the NSF reference ranges for good or typical sleep from above.</p>')
   cat(img_tag(plot_nights(d, r$guideline, s$ref_se_min, s$ref_sol_max), height = 3.2, alt = "Sleep measures across nights"))
   mid_sd <- tm$sd_min[tm$var == "midpoint"]
   cat(sprintf('<p>Each bar below is one night, from getting into bed (top) to getting up (bottom).%s</p>',
@@ -148,6 +149,7 @@ enough <- n_pair_sleep >= s$min_days
 if (!enough) {
   note(sprintf("We need at least %d days with both a diary and a night of sleep watch data to look at these patterns, and we have %d from you.",
                s$min_days, n_pair_sleep))
+  cat(redo_offer_html(params$contact))
 }
 if (enough) cat(events_sleep_html(r))
 ```
