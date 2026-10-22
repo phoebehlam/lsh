@@ -9,10 +9,10 @@
   help_n   = list(more = "helped someone one more time",
                   general = "On days when you helped others more",
                   noun = "helping others"),
-  neg_pomp = list(more = "rated your negative mood 10 points higher (out of 100)",
+  neg_pomp = list(more = "rated your negative mood 10% higher than your typical",
                   general = "On days when your negative mood was higher",
                   noun = "negative mood"),
-  pos_pomp = list(more = "rated your positive mood 10 points higher (out of 100)",
+  pos_pomp = list(more = "rated your positive mood 10% higher than your typical",
                   general = "On days when your positive mood was higher",
                   noun = "positive mood")
 )

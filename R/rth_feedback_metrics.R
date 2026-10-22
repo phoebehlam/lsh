@@ -9,13 +9,14 @@ rth_settings <- function() {
   list(
     min_days       = 7,     # minimum paired days for a slope / correlation
     min_distinct_x = 3,     # predictor must take at least this many values
-    pomp_unit      = 10,    # effect unit for 0-100 scales (mood -> sleep)
+    mood_pct_unit  = 10,    # mood -> sleep step: mood this % higher than the teen's typical
     count_unit     = 1,     # effect unit for event counts
     clock_anchor_h = 18,    # clock times averaged on a 6 PM - 6 PM day
     # "About the same" bands: differences smaller than these are described as
     # no real difference (descriptive rounding, not a statistical test).
+    # (Mood bands are in % of the teen's typical mood.)
     same_band = c(tst = 10, se = 2, sol = 5, awakenings = 1,
-                  neg_pomp = 5, pos_pomp = 5),
+                  neg_pomp = 10, pos_pomp = 10),
     # Resource list trigger: negative mood POMP >= cutoff on >= share of days,
     # with at least min_days completed diaries.
     # When every day-to-night link is "about the same", show this many of the
@@ -30,8 +31,8 @@ rth_settings <- function() {
     # Largest difference shown as an exact number in the "went together"
     # sections. Bigger ones show as e.g. "+ >60 min": with ~2 weeks of days an
     # estimate that large isn't reliable. (Sleep efficiency is in % points;
-    # mood caps apply to the events-and-mood chart.)
-    link_cap = c(tst = 60, sol = 45, se = 30, awakenings = 10, neg_pomp = 50, pos_pomp = 50),
+    # mood caps are in % of the teen's typical mood, for the events-and-mood chart.)
+    link_cap = c(tst = 60, sol = 45, se = 30, awakenings = 10, neg_pomp = 50, pos_pomp = 50),  # mood: % of typical
     trigger_cutoff = 60,
     trigger_share  = 0.5,
     # Published reference values shown on the "at a glance" bars
@@ -49,8 +50,8 @@ rth_vars <- function() {
       "stress_n", "Unpleasant events",  "reported one more unpleasant event",              "count",
       "pos_n",    "Positive events",   "reported one more positive event",               "count",
       "help_n",   "Helping others",    "helped someone one more time",                   "count",
-      "neg_pomp", "Negative mood",     "rated your negative mood 10 points higher (out of 100)", "pomp",
-      "pos_pomp", "Positive mood",     "rated your positive mood 10 points higher (out of 100)", "pomp"
+      "neg_pomp", "Negative mood",     "rated your negative mood 10% higher than your typical", "pomp",
+      "pos_pomp", "Positive mood",     "rated your positive mood 10% higher than your typical", "pomp"
     ),
     sleep_outcomes = tibble::tribble(
       ~var,          ~short,            ~unit,
@@ -180,15 +181,28 @@ within_slope <- function(x, y, unit, same_band, s = rth_settings()) {
   res
 }
 
+#' A teen's typical mood on the 1-5 scale they answered on
+#'
+#' Mood is stored as 0-100 (POMP) for the items' 1-5 scale. Percent changes
+#' are taken relative to the 1-5 average, which is never below 1, so a teen
+#' whose mood is usually near the bottom doesn't get runaway percentages.
+#' @keywords internal
+mood_typical_raw <- function(pomp) 1 + 4 * mean(pomp, na.rm = TRUE) / 100
+
 link_table <- function(days, predictors, outcomes, s = rth_settings()) {
   pv <- rth_vars()$predictors
+  mood <- c("neg_pomp", "pos_pomp")
   out <- list()
   for (p in predictors) {
     type <- pv$type[pv$var == p]
-    unit <- if (type == "pomp") s$pomp_unit else s$count_unit
+    # Mood predictors: a step of mood_pct_unit % of the teen's typical
+    # (in 0-100 points: % x typical(1-5) x 25 points per scale step).
+    unit <- if (type == "pomp") s$mood_pct_unit / 100 * mood_typical_raw(days[[p]]) * 25 else s$count_unit
     for (o in outcomes) {
       if (p == o) next
-      r <- within_slope(days[[p]], days[[o]], unit, s$same_band[[o]], s)
+      # Mood outcomes: change as % of the teen's typical (points / 25 / typical x 100)
+      if (o %in% mood) unit_o <- unit * 4 / mood_typical_raw(days[[o]]) else unit_o <- unit
+      r <- within_slope(days[[p]], days[[o]], unit_o, s$same_band[[o]], s)
       cap <- if (is.null(s$link_cap) || is.na(s$link_cap[o])) Inf else s$link_cap[[o]]
       capped <- !is.na(r$est) & abs(r$est) > cap
       out[[length(out) + 1]] <- tibble::tibble(

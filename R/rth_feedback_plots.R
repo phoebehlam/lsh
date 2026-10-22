@@ -50,7 +50,7 @@ plot_nights <- function(days, guideline = NULL, ref_se_min = 85, ref_sol_max = 3
   long <- dplyr::bind_rows(
     tibble::tibble(date = d$date, panel = "Sleep time (hours)", value = d$tst / 60),
     tibble::tibble(date = d$date, panel = "Sleep efficiency (%)", value = d$se),
-    tibble::tibble(date = d$date, panel = "Sleep latency (minutes)", value = d$sol),
+    tibble::tibble(date = d$date, panel = "Time to fall asleep (minutes)", value = d$sol),
     tibble::tibble(date = d$date, panel = "Times you woke up", value = d$awakenings))
   long$panel <- factor(long$panel, levels = unique(long$panel))
   avg <- dplyr::summarise(dplyr::group_by(long, panel), m = mean(value, na.rm = TRUE))
@@ -58,7 +58,7 @@ plot_nights <- function(days, guideline = NULL, ref_se_min = 85, ref_sol_max = 3
   p <- ggplot2::ggplot(long, ggplot2::aes(date, value))
   x0 <- min(long$date) - .6; x1 <- max(long$date) + .6
   lv <- levels(long$panel)
-  bands <- data.frame(panel = factor(c("Sleep efficiency (%)", "Sleep latency (minutes)"), levels = lv),
+  bands <- data.frame(panel = factor(c("Sleep efficiency (%)", "Time to fall asleep (minutes)"), levels = lv),
                       lo = c(ref_se_min, 0),
                       hi = c(max(100, max(d$se, na.rm = TRUE)), ref_sol_max))
   if (!is.null(guideline)) {
@@ -150,21 +150,22 @@ plot_events <- function(days) {
 #' @keywords internal
 plot_mood <- function(days) {
   d <- dplyr::filter(days, !is.na(neg_pomp) | !is.na(pos_pomp))
+  # shown on the 1-5 scale teens answered on (stored as 0-100)
   long <- dplyr::bind_rows(
-    tibble::tibble(date = d$date, who = "Negative mood", v = d$neg_pomp),
-    tibble::tibble(date = d$date, who = "Positive mood", v = d$pos_pomp))
+    tibble::tibble(date = d$date, who = "Negative mood", v = 1 + 4 * d$neg_pomp / 100),
+    tibble::tibble(date = d$date, who = "Positive mood", v = 1 + 4 * d$pos_pomp / 100))
   ggplot2::ggplot(long, ggplot2::aes(date, v, colour = who, shape = who)) +
     ggplot2::geom_line(linewidth = .lw) + ggplot2::geom_point(size = .pt + .2) +
     ggplot2::scale_colour_manual(values = c(`Negative mood` = rth_pal$stress,
                                             `Positive mood` = rth_pal$sleep)) +
     ggplot2::scale_shape_manual(values = c(`Negative mood` = 16, `Positive mood` = 17)) +
-    ggplot2::scale_y_continuous(limits = c(0, 100), breaks = c(0, 25, 50, 75, 100)) +
-    .date_axis() + ggplot2::labs(x = NULL, y = "Out of 100") + theme_rth()
+    ggplot2::scale_y_continuous(limits = c(1, 5), breaks = 1:5) +
+    .date_axis() + ggplot2::labs(x = NULL, y = "Rating (1 to 5)") + theme_rth()
 }
 
-#' Change in mood on days with one more event: one shared axis (mood points)
+#' Change in mood on days with one more event: one shared axis (\% of the teen's typical mood)
 #' @keywords internal
-plot_mood_change <- function(links, band = 5) {
+plot_mood_change <- function(links, band = 10) {
   ttl <- c(stress_n = "On days with 1 more unpleasant event",
            pos_n = "On days with 1 more positive event",
            help_n = "On days you helped others 1 more time")
@@ -178,13 +179,13 @@ plot_mood_change <- function(links, band = 5) {
   d$val[ok & abs(d$val) < .1] <- .1          # a sliver so a zero still shows
   d$txt <- mapply(function(e, s, cp) {
     if (s %in% c("too_few_days", "no_variation")) return("not enough days")
-    if (isTRUE(cp)) return(sprintf("%s >%d pts", if (e > 0) "+" else intToUtf8(8722), round(abs(e))))
+    if (isTRUE(cp)) return(sprintf("%s >%d%%", if (e > 0) "+" else intToUtf8(8722), round(abs(e))))
     r <- round(e)
-    if (r == 0) return("0 pts")
-    sprintf("%s%d %s", if (r > 0) "+" else intToUtf8(8722), abs(r), if (abs(r) == 1) "pt" else "pts")
+    if (r == 0) return("0%")
+    sprintf("%s%d%%", if (r > 0) "+" else intToUtf8(8722), abs(r))
   }, d$est_show, links$status, d$capped)
   d$val_lab <- ifelse(ok, d$val, 0)
-  lim <- max(15, ceiling(max(abs(d$val), na.rm = TRUE) / 5) * 5 + 8)
+  lim <- max(band * 2.5, ceiling(max(abs(d$val), na.rm = TRUE) / 5) * 5 + 10)
   d$hj <- ifelse(!is.na(d$val) & d$val < 0, 1.12, -0.12)
   ggplot2::ggplot(d, ggplot2::aes(y = outcome)) +
     ggplot2::annotate("rect", xmin = -band, xmax = band, ymin = -Inf, ymax = Inf, fill = rth_pal$same) +
@@ -197,9 +198,9 @@ plot_mood_change <- function(links, band = 5) {
                                           `Positive mood` = rth_pal$positive), guide = "none") +
     ggplot2::scale_x_continuous(limits = c(-lim, lim),
                                 labels = function(x) ifelse(x == 0, "0\nyour typical",
-                                  ifelse(x > 0, paste0("+", x), sub("-", intToUtf8(8722), as.character(x))))) +
+                                  ifelse(x > 0, paste0("+", x, "%"), paste0(sub("-", intToUtf8(8722), as.character(x)), "%")))) +
     ggplot2::facet_wrap(~predictor, ncol = 1) +
-    ggplot2::labs(x = "Change in mood that day (points out of 100)", y = NULL) +
+    ggplot2::labs(x = "Mood that day compared with your typical", y = NULL) +
     theme_rth() +
     ggplot2::theme(panel.grid.major.y = ggplot2::element_blank(),
                    panel.grid.major.x = ggplot2::element_line(colour = rth_pal$grid, linewidth = .3),

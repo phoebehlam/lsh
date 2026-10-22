@@ -162,7 +162,7 @@ test_that("overview cards show the standout link", {
   expect_equal(h$sub, "sleep after days with 1 more unpleasant event")
   l2 <- rbind(l, tibble::tibble(predictor = "pos_pomp", outcome = "awakenings", n = 14, est = -2.5, status = "shown"))
   expect_equal(link_highlight(l2, s, "sleep")$value, "&minus;24 min")     # events first
-  expect_equal(link_highlight(l2[3, ], s, "sleep")$sub, "wake-ups after days with 10-pt higher positive mood")
+  expect_equal(link_highlight(l2[3, ], s, "sleep")$sub, "wake-ups after days with 10% higher positive mood")
   l$status <- "about_same"
   expect_equal(link_highlight(l, s, "sleep")$value, "About the same")
   l$status <- "too_few_days"
@@ -227,8 +227,8 @@ test_that("all-'about the same' sleep section still shows the mood cards", {
                       outcome = c("tst", "se", "sol", "awakenings"), stringsAsFactors = FALSE)
   r$sleep_links <- tibble::tibble(grid, n = 14, est = 0.5, status = "about_same", est_show = 0.5, capped = FALSE)
   h <- events_sleep_html(r)
-  expect_match(h, "On days your negative mood was 10 points higher")
-  expect_match(h, "On days your positive mood was 10 points higher")
+  expect_match(h, "On days your negative mood was 10% higher than your typical")
+  expect_match(h, "On days your positive mood was 10% higher than your typical")
   expect_false(grepl("1 more unpleasant event&hellip;", h))
   expect_match(h, "regardless of your events or mood</strong>, for all 20 comparisons.")
   expect_match(h, "See which ones")
@@ -251,4 +251,57 @@ test_that("too few paired days: redo offer shown, flagged in the staff log; old 
   expect_equal(lg$id, c("0001", "5678"))
   expect_equal(lg$redo_offer, c("", "TRUE"))
   expect_equal(lg$resource_box[1], "FALSE")
+})
+
+test_that("mood is in % of the teen's typical (1-5 scale)", {
+  x <- rep(0:2, length.out = 14)
+  # negative mood: 25 points (= 1 step on the 1-5 scale) higher per event
+  d <- tibble::tibble(date = Sys.Date() + 0:13, stress_n = x, neg_pomp = 25 * x,
+                      tst = 400 + 2 * (25 * x), se = 88, sol = 15, awakenings = 2)
+  s <- rth_settings(); s$clip_mad_k <- Inf
+  typ <- 1 + 4 * mean(d$neg_pomp) / 100            # typical on the 1-5 scale
+  ml <- link_table(d, "stress_n", "neg_pomp", s)
+  expect_equal(ml$est, 1 / typ * 100)               # +1 scale step per event, as % of typical
+  expect_equal(mood_typical_raw(c(0, 0, 100)), 1 + 4 / 3)
+  # mood -> sleep: step = 10% of typical = 0.1 * typ scale steps = 2.5 * typ points
+  sl <- link_table(d, "neg_pomp", "tst", s)
+  expect_equal(sl$est, 2 * 0.1 * typ * 25)
+  expect_equal(link_value("neg_pomp", 12.4), "+12%")
+  expect_equal(link_value("neg_pomp", -60, TRUE), "&minus; &gt;60%")
+})
+
+test_that("highlights recap uses the report's own numbers", {
+  ex <- file.path(.rth_home(), "example_data")
+  nd <- read_night_diary(file.path(ex, "sim_night_diary.sav"), "1234")
+  md <- read_morning_diary(file.path(ex, "sim_morning_diary.sav"), "1234")
+  ac <- read_actigraphy(file.path(ex, "sim_sleep_1234.csv"))
+  r <- compute_report("1234", 16, nd, md, ac)
+  h <- highlights_html(r)
+  expect_false(grepl("You showed up", h))
+  expect_match(h, sprintf(">%d</span><span class=\"hl-line\">positive events", round(sum(r$days$pos_n, na.rm = TRUE))))
+  expect_match(h, sprintf(">%d</span><span class=\"hl-line\">times you helped", round(sum(r$days$help_n, na.rm = TRUE))))
+  tst <- round(r$sleep$mean[r$sleep$var == "tst"]); se <- round(r$sleep$mean[r$sleep$var == "se"])
+  expect_match(h, sprintf("Your sleep</span><span class=\"hl-value\">%dh %02dm<", tst %/% 60, tst %% 60), fixed = TRUE)
+  expect_match(h, sprintf("Sleep efficiency</span><span class=\"hl-value\">%d%%<", se), fixed = TRUE)
+  expect_match(h, "more negative feelings on days with one extra unpleasant event, like an argument")
+  expect_equal(lengths(regmatches(h, gregexpr('class="hl"', h))), 6)
+  # no diaries and no watch: no tiles, no error
+  r0 <- r; r0$n_diary <- 0; r0$n_nights <- 0
+  r0$mood_links$status <- "too_few_days"; r0$sleep_links$status <- "too_few_days"
+  expect_false(grepl('class="hl"', highlights_html(r0)))
+})
+
+test_that("highlight tiles use plain words with the direction spelled out", {
+  s <- rth_settings()
+  l <- tibble::tibble(predictor = c("stress_n", "help_n"), outcome = c("tst", "awakenings"), n = 14,
+                      est = c(-11.2, -1.05), status = "shown", est_show = c(-11.2, -1.05), capped = FALSE)
+  expect_equal(link_plain(l, s, "sleep"), list(value = "11 min", line = "less sleep after days with one extra unpleasant event, like an argument"))
+  expect_equal(link_plain(l[2, ], s, "sleep")$line, "fewer wake-ups after days you helped someone one extra time")
+  m <- tibble::tibble(predictor = "stress_n", outcome = "neg_pomp", n = 14, est = 72, status = "shown",
+                      est_show = 50, capped = TRUE)
+  expect_equal(link_plain(m, s, "mood"), list(value = "&gt;50%", line = "more negative feelings on days with one extra unpleasant event, like an argument"))
+  m$status <- "about_same"
+  expect_equal(link_plain(m, s, "mood")$value, "Steady")
+  m$status <- "too_few_days"
+  expect_null(link_plain(m, s, "mood"))
 })

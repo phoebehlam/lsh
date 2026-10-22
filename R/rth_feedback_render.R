@@ -139,7 +139,7 @@ link_value <- function(o, e, capped = FALSE) {
       tst = , sol = sprintf("%s &gt;%d min", sg, round(a)),
       se = sprintf("%s &gt;%d%%", sg, round(a)),
       awakenings = sprintf("%s &gt;%s times", sg, format(a)),
-      sprintf("%s &gt;%d pts", sg, round(a))))
+      sprintf("%s &gt;%d%%", sg, round(a))))
   }
   # No sign when the difference rounds to zero ("0 min", not "-0 min")
   if ((o == "awakenings" && round(a, 1) == 0) || (o != "awakenings" && round(a) == 0)) sg <- ""
@@ -147,20 +147,20 @@ link_value <- function(o, e, capped = FALSE) {
     tst = , sol = paste0(sg, round(a), " min"),
     se = paste0(sg, round(a), "%"),
     awakenings = if (sg == "") "0 times" else paste0(sg, format(round(a, 1), nsmall = 1), if (round(a, 1) == 1) " time" else " times"),
-    paste0(sg, round(a), if (round(a) == 1) " pt" else " pts"))
+    paste0(sg, round(a), "%"))
 }
 
-cap_note <- '<p class="hint">A &ldquo;&gt;&rdquo; before a number (like &gt;60 min) means the difference was bigger than that. With only about two weeks of days, we don&rsquo;t show exact numbers that large, because they can&rsquo;t be pinned down reliably.</p>'
+cap_note <- '<p class="hint">A &ldquo;&gt;&rdquo; before a number (like &gt;60 min) means the difference was bigger than that. With only about two weeks of days, numbers that large can&rsquo;t be pinned down exactly.</p>'
 
 #' Overview-card highlight: the link that stood out most (relative to its
 #' "about the same" band), phrased to fit a card.
 #' @keywords internal
 link_highlight <- function(links, s, kind = c("sleep", "mood"), n_days = NA) {
   kind <- match.arg(kind)
-  u <- s$pomp_unit
+  u <- s$mood_pct_unit
   pred <- c(stress_n = "1 more unpleasant event", pos_n = "1 more positive event",
-            help_n = "more helping", neg_pomp = sprintf("%d-pt higher negative mood", u),
-            pos_pomp = sprintf("%d-pt higher positive mood", u))
+            help_n = "more helping", neg_pomp = sprintf("%d%% higher negative mood", u),
+            pos_pomp = sprintf("%d%% higher positive mood", u))
   outc <- c(tst = "sleep", se = "sleep efficiency", sol = "time to fall asleep",
             awakenings = "wake-ups", neg_pomp = "negative mood", pos_pomp = "positive mood")
   if (is.null(links) || !nrow(links) || !any(links$status %in% c("shown", "about_same"))) {
@@ -185,15 +185,93 @@ link_highlight <- function(links, s, kind = c("sleep", "mood"), n_days = NA) {
   if (isTRUE(x$capped)) {
     value <- switch(x$outcome, tst = , sol = sprintf("%s &gt;%d min", sg, round(a)),
                     se = sprintf("%s &gt;%d%%", sg, round(a)),
-                    awakenings = sprintf("%s &gt;%s", sg, format(a)), sprintf("%s &gt;%d pts", sg, round(a)))
+                    awakenings = sprintf("%s &gt;%s", sg, format(a)), sprintf("%s &gt;%d%%", sg, round(a)))
     return(list(value = value, sub = sprintf("%s %s %s", outc[[x$outcome]], joiner, pred[[x$predictor]])))
   }
   value <- switch(x$outcome,
     tst = , sol = paste0(sg, round(a), " min"),
     se = paste0(sg, round(a), "%"),
     awakenings = paste0(sg, format(round(a, 1), nsmall = 1)),
-    paste0(sg, round(a), if (round(a) == 1) " pt" else " pts"))
+    paste0(sg, round(a), "%"))
   list(value = value, sub = sprintf("%s %s %s", outc[[x$outcome]], joiner, pred[[x$predictor]]))
+}
+
+#' "Your highlights" recap at the top of the report
+#'
+#' Short, upbeat tiles (participation, positive events, helping, typical
+#' sleep, and the standout events-mood and events-sleep links). Every number
+#' comes straight from the sections below; tiles with nothing to show are
+#' left out.
+#' @keywords internal
+highlights_html <- function(r) {
+  s <- r$settings; d <- r$days
+  tile <- function(href, kicker, value, line, col)
+    sprintf('<a class="hl" href="#%s" style="--c:%s"><span class="hl-kicker">%s</span><span class="hl-value">%s</span><span class="hl-line">%s</span></a>',
+            href, col, kicker, value, line)
+  tiles <- character()
+  if (r$n_diary > 0) {
+    pos <- round(sum(d$pos_n, na.rm = TRUE)); hlp <- round(sum(d$help_n, na.rm = TRUE))
+    if (pos > 0) tiles <- c(tiles, tile("days", "Good stuff", pos,
+      sprintf("positive %s, like quality time or feeling cared for", if (pos == 1) "event" else "events"), "#2FB5A6"))
+    if (hlp > 0) tiles <- c(tiles, tile("days", "Helping hand", hlp,
+      sprintf("%s you helped someone, like with chores or giving advice", if (hlp == 1) "time" else "times"), "#9A8AE6"))
+  }
+  if (r$n_nights > 0) {
+    tst <- round(r$sleep$mean[r$sleep$var == "tst"]); se <- r$sleep$mean[r$sleep$var == "se"]
+    tiles <- c(tiles, tile("sleep", "Your sleep", sprintf("%dh %02dm", tst %/% 60, tst %% 60),
+                           "That&rsquo;s your typical night of shut-eye. Zzz!", "#F7A35C"))
+    if (!is.na(se)) tiles <- c(tiles, tile("sleep", "Sleep efficiency", sprintf("%d%%", round(se)),
+      "of your time in bed, you were actually snoozing", "#7D93B5"))
+  }
+  hm <- link_plain(r$mood_links, s, "mood")
+  if (!is.null(hm)) tiles <- c(tiles, tile("mood-links", "Events &amp; mood", hm$value, hm$line, "#EE8A72"))
+  hs <- link_plain(r$sleep_links, s, "sleep")
+  if (!is.null(hs)) tiles <- c(tiles, tile("sleep-links", "Events &amp; sleep", hs$value, hs$line, "#E8879C"))
+  paste0('<div class="hl-grid">', paste(tiles, collapse = ""), '</div>')
+}
+
+#' Plain-language version of the standout link, for the highlights tiles
+#'
+#' Same pick as link_highlight() (events before mood, biggest relative to its
+#' "about the same" zone), but worded for teens: a size ("20%", "11 min") and
+#' a short sentence with the direction ("more negative feelings on days with
+#' one extra unpleasant event"). NULL when there aren't enough days.
+#' @keywords internal
+link_plain <- function(links, s, kind = c("sleep", "mood")) {
+  kind <- match.arg(kind)
+  if (is.null(links) || !nrow(links) || !any(links$status %in% c("shown", "about_same"))) return(NULL)
+  if (!"est_show" %in% names(links)) { links$est_show <- links$est; links$capped <- FALSE }
+  sh <- links[links$status == "shown", ]
+  if (!nrow(sh)) {
+    return(list(value = "Steady",
+                line = if (kind == "sleep") "your sleep stayed about the same no matter what kind of day you had"
+                       else "your mood stayed about the same no matter what happened in your day"))
+  }
+  sh$rel <- abs(sh$est) / unlist(s$same_band[sh$outcome])
+  ev <- sh[sh$predictor %in% c("stress_n", "pos_n", "help_n"), ]
+  if (nrow(ev)) sh <- ev
+  x <- sh[which.max(sh$rel), ]
+  o <- x$outcome; e <- x$est_show; up <- e > 0; a <- abs(e)
+  gt <- if (isTRUE(x$capped)) "&gt;" else ""
+  value <- switch(o,
+    tst = , sol = sprintf("%s%d min", gt, round(a)),
+    awakenings = if (gt == "") format(round(a, 1), nsmall = 1) else sprintf("&gt;%s", format(a)),
+    sprintf("%s%d%%", gt, round(a)))
+  what <- switch(o,
+    tst = if (up) "more sleep" else "less sleep",
+    sol = if (up) "longer to fall asleep" else "faster to fall asleep",
+    se = if (up) "higher sleep efficiency" else "lower sleep efficiency",
+    awakenings = if (up) "more wake-ups" else "fewer wake-ups",
+    neg_pomp = if (up) "more negative feelings" else "fewer negative feelings",
+    pos_pomp = if (up) "more positive feelings" else "fewer positive feelings")
+  when <- if (kind == "sleep") "after days" else "on days"
+  who <- switch(x$predictor,
+    stress_n = "with one extra unpleasant event, like an argument",
+    pos_n = "with one extra positive event, like quality time with friends",
+    help_n = "you helped someone one extra time",
+    neg_pomp = sprintf("you felt %d%% more negative", s$mood_pct_unit),
+    pos_pomp = sprintf("you felt %d%% more positive", s$mood_pct_unit))
+  list(value = value, line = paste(what, when, who))
 }
 
 #' "Your events" overview card: positive events or helping a day, whichever
@@ -273,12 +351,11 @@ glance_html <- function(r) {
         ref = if (!is.null(g)) c(g$lo, g$hi), ref_txt = if (!is.null(g)) sprintf("Recommended (NSF): %d&ndash;%d h", g$lo, g$hi) else ""),
     row("Time in bed", "from getting into bed to getting up", fmt_hm(get("tib", "mean")),
         rng("tib", fmt_hm), "tib", h_lo, h_hi, div = 60),
-    timing_rows(r),
     row("Sleep efficiency", "the % of your time in bed that you spent asleep",
         paste0(round(get("se", "mean")), "%"), rng("se", function(x) paste0(round(x), "%")),
         "se", se_lo, 100, ref = c(s$ref_se_min, 100),
         ref_txt = sprintf("Typical for good sleep (NSF): %d%% or more", s$ref_se_min)),
-    row("Sleep latency", "how long it took you to fall asleep after getting into bed", fmt_hm(get("sol", "mean")),
+    row("Time to fall asleep", "how long it took you to fall asleep after getting into bed", fmt_hm(get("sol", "mean")),
         rng("sol", fmt_hm), "sol", 0, sol_hi, ref = c(0, s$ref_sol_max),
         ref_txt = sprintf("Typical for good sleep (NSF): %d min or less", s$ref_sol_max)),
     row("Times you woke up", "how often the watch picked up you being awake during the night, even briefly",
@@ -303,13 +380,13 @@ events_sleep_html <- function(r) {
   preds <- c(stress_n = "On days with 1 more unpleasant event",
              pos_n    = "On days with 1 more positive event",
              help_n   = "On days you helped others 1 more time",
-             neg_pomp = sprintf("On days your negative mood was %d points higher", s$pomp_unit),
-             pos_pomp = sprintf("On days your positive mood was %d points higher", s$pomp_unit))
+             neg_pomp = sprintf("On days your negative mood was %d%% higher than your typical", s$mood_pct_unit),
+             pos_pomp = sprintf("On days your positive mood was %d%% higher than your typical", s$mood_pct_unit))
   short <- c(stress_n = "unpleasant events", pos_n = "positive events", help_n = "helping others",
              neg_pomp = "negative mood", pos_pomp = "positive mood")
   col <- c(stress_n = rth_pal$stress, pos_n = rth_pal$positive, help_n = rth_pal$help,
            neg_pomp = rth_pal$stress, pos_pomp = rth_pal$positive)
-  outs <- c(tst = "Sleep time", se = "Sleep efficiency", sol = "Sleep latency", awakenings = "Times you woke up")
+  outs <- c(tst = "Sleep time", se = "Sleep efficiency", sol = "Time to fall asleep", awakenings = "Times you woke up")
   unit_txt <- c(tst = "min", se = "points", sol = "min", awakenings = "times")
   if (!"est_show" %in% names(sk)) { sk$est_show <- sk$est; sk$capped <- FALSE }
   shown <- sk[sk$status == "shown", ]
@@ -339,7 +416,7 @@ events_sleep_html <- function(r) {
     }
     out
   }
-  how_to_read <- 'The dark dot in the middle (&ldquo;your typical&rdquo;) is your usual night, just like &ldquo;your average&rdquo; in the charts above. The colored bar shows how that night tended to differ: a bar to the right means more of that measure, to the left means less. A bar that stays inside the grey zone counts as &ldquo;about the same.&rdquo;'
+  how_to_read <- 'The dot in the middle is your typical night. Bar to the right? More than usual. To the left? Less. Stays in the grey zone? That&rsquo;s &ldquo;about the same.&rdquo;'
 
   out <- ""
   if (!nrow(shown)) {
@@ -348,8 +425,8 @@ events_sleep_html <- function(r) {
     mood_cards <- same[same$predictor %in% c("neg_pomp", "pos_pomp"), ]
     k <- s$same_show_top
     if (nrow(mood_cards)) {
-      out <- paste0('<p>Each card compares a day with the sleep you got <em>that night</em>. ', how_to_read, '</p>',
-                    '<p>None of your comparisons stood out, so here are the ones for your mood. Notice that every bar stays inside the grey zone.</p>',
+      out <- paste0('<p>Did your days follow you to bed? Each card shows how your sleep <em>that night</em> tended to look after different kinds of days. ', how_to_read, '</p>',
+                    '<p>None of your comparisons stood out, so here are the ones for your mood. Every bar stays inside the grey zone.</p>',
                     cards(mood_cards))
     } else if (!is.null(k) && k > 0 && nrow(same)) {
       same$rel <- abs(same$est) / unlist(s$same_band[same$outcome])
@@ -365,7 +442,7 @@ events_sleep_html <- function(r) {
                                  nrow(same), if (nrow(same) < nrow(sk)) " we could look at" else "", chips))
     }
   } else {
-    out <- paste0('<p>Each card compares a day with the sleep you got <em>that night</em>. We only show the ones that stood out. ', how_to_read, '</p>', cards(shown),
+    out <- paste0('<p>Did your days follow you to bed? Each card shows how your sleep <em>that night</em> tended to look after different kinds of days. We only show the ones that stood out. ', how_to_read, '</p>', cards(shown),
                   if (any(shown$capped)) cap_note else "")
     if (nrow(same)) {
       chips <- paste(sprintf('<span class="chip">%s &rarr; %s</span>', short[same$predictor],
@@ -374,7 +451,7 @@ events_sleep_html <- function(r) {
                                  nrow(same), nrow(sk), chips))
     }
   }
-  out <- paste0(out, '<div class="callout"><p><strong>What this can and can&rsquo;t tell you.</strong> Here there is an order: the day comes first, then the night. So this section looks at how a day tended to be followed by that night&rsquo;s sleep. That still isn&rsquo;t the same as one causing the other. Take days with more unpleasant events: if you tended to sleep less after them, it could be that what happened kept you up, or that something else, like a late practice or a big assignment due, both made the day harder and pushed your bedtime later. A short night before could also make the next day feel harder.</p></div>')
+  out <- paste0(out, '<div class="callout"><p><strong>What this can and can&rsquo;t tell you.</strong> The day came before the night, but that doesn&rsquo;t mean the day caused how you slept. Something else could explain both: for example, a late practice could make a day harder <em>and</em> push your bedtime later.</p></div>')
   if (nrow(missing)) {
     out <- paste0(out, sprintf('<p class="hint">Not enough days to look at: %s.</p>',
                                paste(unique(sprintf("%s and %s", short[missing$predictor], tolower(outs[missing$outcome]))), collapse = "; ")))
@@ -403,7 +480,7 @@ events_glance_html <- function(r) {
       pct(av, hi), round(mn), round(mx), hi)
   }
   paste0(
-    '<p class="g-legend"><span class="lg lg-avg"></span>your average <span class="lg lg-range"></span>your range across days</p>',
+    '<p class="g-legend"><span class="lg lg-avg"></span>your average <span class="lg lg-range lg-neutral"></span>your range across days</p>',
     row("stress_n", "Unpleasant events", "like arguments or lots of schoolwork", rth_pal$stress),
     row("pos_n", "Positive events", "like quality time or feeling cared for by family or friends", rth_pal$sleep),
     row("help_n", "Times you helped others", "like helping with chores, giving advice, or standing up for someone", rth_pal$help))

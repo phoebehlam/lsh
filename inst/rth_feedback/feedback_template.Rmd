@@ -40,26 +40,18 @@ cat(sprintf('<p class="dates">%s to %s &middot; %d diary days &middot; %d nights
 </header>
 
 <section class="intro">
-<p><strong>Thank you for completing the daily assessments!</strong> For about two weeks you wore a sleep watch and told us about your days each night. This report puts those pieces together so you can see your own patterns.</p>
-<p>Everything here describes <em>your</em> days only. It shows what tended to happen together, not what caused what. We are researchers, not medical doctors, so we can't give health advice or interpretations.</p>
+<p><strong>Thank you for completing the daily assessments!</strong> For about two weeks you wore a sleep watch and told us about your days. This report shows your specific patterns, but since we&rsquo;re researchers, not medical doctors, we can&rsquo;t give health advice or interpretations.</p>
 </section>
 
-<p class="cards-hint"><strong>Your overview.</strong> Each card sums up one section of this report; scroll down for the details. On a computer, you can click a card to jump to its section.</p>
-<nav class="cards">
+<section id="highlights" class="highlights">
+<h2>Your highlights</h2>
 ```{r}
-tst_card <- if (has_sleep) fmt_hm(sl$tst) else "&mdash;"
-bed_card <- if (has_sleep) tm$mean_clock[tm$var == "bed"] else "&mdash;"
-ev <- events_card(dsm)
-cat(card("days", "Your events", ev$value, ev$sub))
-cat(card("mood", "Your mood", if (has_diary) sprintf("%s/100", round(dsm$pos_pomp)) else "&mdash;", "average positive mood"))
-hm <- link_highlight(r$mood_links, s, "mood")
-cat(card("mood-links", "Events &amp; mood", hm$value, hm$sub))
-cat(card("sleep", "Sleep", tst_card, "average sleep a night"))
-cat(card("sleep", "Sleep timing", bed_card, "average bedtime"))
-hs <- link_highlight(r$sleep_links, s, "sleep")
-cat(card("sleep-links", "Events &amp; sleep", hs$value, hs$sub))
+cat(highlights_html(r))
 ```
-</nav>
+<p class="hl-more">Want the full story? Keep scrolling for your full report.</p>
+</section>
+
+<h2 class="part">Your full report</h2>
 
 <section id="days">
 <h2>Your days</h2>
@@ -72,9 +64,10 @@ if (!has_diary) {
   cat(events_glance_html(r))
   cat(sources_html(dom))
   cat('<h3 id="mood">Your mood</h3>')
-  cat(sprintf("<p>You also rated how you felt each day. We put each mood on a 0 to 100 scale, where 0 is the lowest possible answer and 100 the highest. Your negative mood (like sad, worried, or lonely) averaged <strong>%s out of 100</strong>, and your positive mood (like happy, calm, or close to others) averaged <strong>%s out of 100</strong>.</p>",
-              round(dsm$neg_pomp), round(dsm$pos_pomp)))
-  cat(img_tag(plot_mood(d), height = 2.5, alt = "Daily mood"))
+  raw <- function(x) format(round(1 + 4 * x / 100, 1), nsmall = 1)
+  cat(sprintf("<p>You also rated how you felt each day, from 1 (lowest) to 5 (highest). Your negative mood (like sad, worried, or lonely) averaged <strong>%s</strong>, and your positive mood (like happy, calm, or close to others) averaged <strong>%s</strong>.</p>",
+              raw(dsm$neg_pomp), raw(dsm$pos_pomp)))
+  cat(img_tag(plot_mood(d), height = 2.5, alt = "Daily mood ratings"))
   if (isTRUE(r$trigger$triggered)) {
     cat('<div class="support-box"><p><strong>You told us that many of your days felt hard.</strong> That\'s worth paying attention to, and you don\'t have to handle it alone. Talking with someone you trust can help, and there are free, confidential resources you can reach any time.</p><p><a href="#support">See the support resources at the end of this report</a>.</p></div>')
   }
@@ -93,11 +86,11 @@ if (n_pair_mood < s$min_days) {
 }
 ttl <- c(stress_n = "Unpleasant events", pos_n = "Positive events", help_n = "Helping others")
 if (n_pair_mood >= s$min_days) {
-  cat("<p>Each bar shows how your mood that day tended to differ on days with <strong>one more</strong> event. Bars inside the grey zone (less than 5 points out of 100 either way) we'd call &ldquo;about the same.&rdquo;</p>")
+  cat("<p>Each bar shows how your mood tended to compare with your typical on days with <strong>one more</strong> event. Bars inside the grey zone mean &ldquo;about the same.&rdquo;</p>")
   cat(img_tag(plot_mood_change(ml, s$same_band[["neg_pomp"]]), height = 3.4,
               alt = "Change in mood on days with one more event"))
   if (any(ml$capped %in% TRUE & ml$status == "shown")) cat(cap_note)
-  cat('<div class="callout"><p><strong>What this can and can&rsquo;t tell you.</strong> These bars show what tended to happen <em>on the same day</em>, not what caused what, or which came first. Take helping others: if your negative mood tended to be lower on days you helped more, it could be that helping lifted your mood, that you were more likely to help when you were already in a good mood, or that something else about those days, like time with friends, made both more likely.</p></div>')
+  cat('<div class="callout"><p><strong>Did you know?</strong> Two people can go through the exact same thing and feel totally different about it. A fight with a friend might ruin one person&rsquo;s whole day, while someone else shakes it off by lunch. Neither is right or wrong; that&rsquo;s just how different people are. Scientists are even curious whether these differences might go along with differences in health, which is one of the things Rise to Health is studying. These bars show how <em>your</em> mood tended to move with your days.</p><p><strong>What this can and can&rsquo;t tell you.</strong> These bars show what happened on the same days, not what caused what. For example, if you were in a better mood on days you helped others, helping may have lifted your mood, or you may have been more likely to help when you were already in a good mood.</p></div>')
 }
 ```
 </section>
@@ -108,34 +101,20 @@ if (n_pair_mood >= s$min_days) {
 if (!has_sleep) {
   note("We didn't get usable sleep watch data for your nights, so this section is empty.")
 } else {
-  g <- r$guideline
-  if (!is.null(g)) {
-    cat(sprintf('<p>The National Sleep Foundation (NSF) recommends <strong>%d to %d hours</strong> of sleep a night for people %s. Over your %d nights with the watch, you slept <strong>%s</strong> on average, ranging from %s to %s.</p>',
-                g$lo, g$hi, g$group, r$n_nights, fmt_hm(sl$tst),
-                fmt_hm(r$sleep$min[r$sleep$var == "tst"]), fmt_hm(r$sleep$max[r$sleep$var == "tst"])))
-  }
+  cat('<p>Here&rsquo;s how you slept, along with what the National Sleep Foundation (NSF) recommends where it has a recommendation.</p>')
   cat(glance_html(r))
 }
 ```
 </section>
 
 <section id="nights">
-<h2>Night to night fluctuations</h2>
+<h2>Night to night</h2>
 ```{r}
-if (!has_sleep) {
-  note("No sleep watch data to show here.")
-} else {
-  sd_tst <- r$sleep$sd[r$sleep$var == "tst"]
-  cat(sprintf('<p>Sleep changes from night to night for everyone. Your sleep time usually landed within about <strong>%s</strong> of your average. This is called <em>sleep variability</em>: the smaller it is, the more regular your sleep.</p>',
-              fmt_hm(sd_tst)))
-  cat('<p class="hint">Dots are nights, the dashed line is your average, and shaded bands are the NSF reference ranges for good or typical sleep from above.</p>')
+if (has_sleep) {
+  cat('<p>Sleep bounces around from night to night for everyone. Here&rsquo;s how yours moved! Each dot is one of your nights, the dashed line is your average, and the peach bands are the NSF reference ranges for good or typical sleep. How many of your dots landed in the peach zone?</p>')
   cat(img_tag(plot_nights(d, r$guideline, s$ref_se_min, s$ref_sol_max), height = 3.2, alt = "Sleep measures across nights"))
-  mid_sd <- tm$sd_min[tm$var == "midpoint"]
-  cat(sprintf('<p>Each bar below is one night, from getting into bed (top) to getting up (bottom).%s</p>',
-              if (!is.na(mid_sd)) sprintf(' The middle of your sleep shifted by about <strong>%s</strong> from night to night.', fmt_hm(mid_sd)) else ""))
-  cat('<p class="legend"><span class="sw sw-bed"></span>In bed <span class="sw sw-sleep"></span>Asleep</p>')
-  cat(img_tag(plot_sleep_window_v(d, s$clock_anchor_h), height = 1.45, alt = "Time in bed and asleep each night"))
-  cat('<p class="bridge">So what goes along with a longer or shorter night, or a calmer or harder day? The next section looks at how your events and that night&rsquo;s sleep moved together.</p>')
+} else {
+  note("No sleep watch data to show here.")
 }
 ```
 </section>
@@ -157,8 +136,8 @@ if (enough) cat(events_sleep_html(r))
 
 <section id="note">
 <h2>A note on these numbers</h2>
-<p>Everything in this report describes only your own days, about two weeks of them. We did not run statistical tests on your data alone, because a couple of weeks from one person isn't what those tests are designed for. So a pattern here is a description of what happened, not evidence that one thing affects another, and it might look different over a different two weeks. When we look at how things went together, we also soften any very unusual night or day a little, so that a single one doesn&rsquo;t decide the whole pattern.</p>
-<p>That's where everyone's data come in. When we combine the diaries and sleep data from all the teens in Rise to Health, we have enough information to run statistical tests and ask questions like whether days with more unpleasant events tend to be followed by shorter sleep for teens in general, and which comes first. Those are the findings we'll share in our scientific publications. Stay tuned!</p>
+<p>This report describes about two weeks of your own days, so your patterns might look different over another two weeks. We did not run statistical tests on one person&rsquo;s data, so these patterns are descriptions of what happened, not proof that one thing affects another. When we looked at how things went together, we also softened any very unusual day or night a little, so that a single one doesn&rsquo;t decide the whole pattern.</p>
+<p>When we combine data from all the teens in Rise to Health, we can test questions like these for teens in general, and then look at how they relate to everyone&rsquo;s blood work to see which ones matter for heart health. Those are the findings we&rsquo;ll share in our scientific publications. Stay tuned!</p>
 </section>
 
 <section id="support">

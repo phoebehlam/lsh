@@ -38,7 +38,7 @@ section.intro { background: transparent; border: none; padding: 4px 2px; }
 
 /* Dashboard cards */
 .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 8px 0 6px; }
-@media (min-width: 560px) { .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* four cards: two per row on every screen */
 .card {
   display: flex; flex-direction: column; gap: 2px; text-decoration: none; color: var(--ink);
   background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 12px 10px;
@@ -105,6 +105,7 @@ details.link-detail > summary { color: var(--ink); }
 .lg:first-child { margin-left: 0; }
 .lg-avg { width: 10px; height: 10px; border-radius: 50%; background: var(--ink); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--ink); }
 .lg-range { width: 18px; height: 6px; border-radius: 3px; background: var(--sleep); }
+.lg-range.lg-neutral { background: #B8B0A8; }
 .lg-ref { width: 18px; height: 10px; border-radius: 3px; background: #F6CFB3; }
 .g-row { padding: 12px 0 10px; border-bottom: 1px solid var(--line); }
 .g-row:last-child { border-bottom: none; }
@@ -154,3 +155,17 @@ h4.sub { text-transform: none; letter-spacing: 0; color: var(--ink); font-size: 
 #mood { scroll-margin-top: 12px; }
 
 .bridge { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); font-style: italic; color: var(--ink); }
+
+/* Highlights recap ------------------------------------------------------- */
+.highlights h2 { margin-bottom: 12px; }
+.hl-intro { color: var(--muted); margin: 0 0 12px; }
+.hl-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.hl { display: flex; flex-direction: column; gap: 2px; padding: 12px 12px 14px; border-radius: 16px;
+      text-decoration: none; color: var(--ink); border: 1px solid var(--line);
+      background: #fff; background: color-mix(in srgb, var(--c) 13%, #fff); border-top: 4px solid var(--c); }
+.hl-kicker { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.hl-value { font-size: 1.7rem; font-weight: 800; line-height: 1.15; }
+.hl-value2 { display: block; font-size: 1.05rem; font-weight: 700; margin-top: 2px; }
+.hl-line { font-size: .82rem; line-height: 1.3; color: var(--ink); opacity: .85; }
+.hl-more { margin: 12px 0 0; font-weight: 600; }
+h2.part { font-size: 1.35rem; margin: 26px 4px 6px; padding-top: 14px; border-top: 2px solid var(--line); }

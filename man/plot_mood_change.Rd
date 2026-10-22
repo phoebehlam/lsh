@@ -2,11 +2,11 @@
 % Please edit documentation in R/rth_feedback_plots.R
 \name{plot_mood_change}
 \alias{plot_mood_change}
-\title{Change in mood on days with one more event: one shared axis (mood points)}
+\title{Change in mood on days with one more event: one shared axis (\% of the teen's typical mood)}
 \usage{
-plot_mood_change(links, band = 5)
+plot_mood_change(links, band = 10)
 }
 \description{
-Change in mood on days with one more event: one shared axis (mood points)
+Change in mood on days with one more event: one shared axis (\% of the teen's typical mood)
 }
 \keyword{internal}
