@@ -1,0 +1,170 @@
+# Readers for the weekly recruitment report ------------------------------------
+#
+# Every reader works on the Qualtrics SPSS (.sav) export as downloaded. Answers
+# are matched by their labels ("Yes", "No", ...) rather than codes, because the
+# screener codes Yes/No differently from question to question.
+
+# Qualtrics response types kept: real responses (0), imported (4), offline (16).
+.rth_keep_status <- c(0, 4, 16)
+
+.lab <- function(x) {
+  if (is.null(x)) return(NULL)
+  if (inherits(x, "haven_labelled")) x <- haven::as_factor(x, levels = "labels")
+  out <- trimws(as.character(x))
+  out[out == ""] <- NA_character_
+  out
+}
+
+# Find a column by name, ignoring case and dots/underscores ("screener_id",
+# "ScreenerID", "screenerid" all match).
+.find_col <- function(df, name) {
+  key <- function(x) tolower(gsub("[._ ]", "", x))
+  hit <- names(df)[key(names(df)) == key(name)]
+  if (length(hit)) hit[1] else NA_character_
+}
+
+# IDs as clean text: no spaces, no trailing ".0"; 4-digit RTH IDs keep leading zeros.
+.clean_id <- function(x, pad = 0) {
+  x <- trimws(as.character(x))
+  x <- sub("\\.0+$", "", x)
+  x[x %in% c("", "NA")] <- NA_character_
+  if (pad > 0) {
+    num <- !is.na(x) & grepl("^[0-9]+$", x) & nchar(x) < pad
+    x[num] <- formatC(as.integer(x[num]), width = pad, flag = "0")
+  }
+  x
+}
+
+.drop_previews <- function(df) {
+  if (!"Status" %in% names(df)) return(df)
+  df[as.numeric(df$Status) %in% .rth_keep_status, , drop = FALSE]
+}
+
+# Study weeks run Saturday-Friday; week 1 starts on study_start (Apr 25, 2026).
+rth_study_week <- function(date, study_start) {
+  as.integer(floor(as.numeric(as.Date(date) - as.Date(study_start)) / 7) + 1)
+}
+.week_start <- function(week, study_start) as.Date(study_start) + 7 * (week - 1)
+.week_label <- function(week, study_start) {
+  s <- .week_start(week, study_start)
+  sprintf("%s&ndash;%s", format(s, "%-m/%-d"), format(s + 6, "%-m/%-d"))
+}
+
+#' Read the Rise to Health prescreen (screener) export
+#'
+#' One row per screener response, with the screening outcome, ineligible
+#' reasons, where they heard about the study, and demographics. Names, emails
+#' and phone numbers are not kept.
+#' @param path Path to the screener .sav.
+#' @param approved Screener IDs of families in the tracking sheet; they count as
+#'   eligible even if the screener said otherwise (e.g. approved after review).
+#' @keywords internal
+read_screener <- function(path, approved = character()) {
+  raw <- haven::read_sav(path)
+  raw <- .drop_previews(raw)
+  n <- nrow(raw)
+  col <- function(v) if (v %in% names(raw)) raw[[v]] else rep(NA, n)
+
+  status <- tolower(trimws(as.character(col("eligi_status"))))
+  status[is.na(status)] <- ""
+  finished <- as.numeric(col("Finished")) %in% 1
+  term <- trimws(as.character(col("Q_TerminateFlag")))
+  screened_out <- !is.na(term) & term != ""
+
+  outcome <- dplyr::case_when(
+    screened_out ~ "Screened out (blocked IP/location)",
+    grepl("_eligible_under18$", status) ~ "Eligible (child 14-17)",
+    grepl("_eligible_18$", status) ~ "Eligible (child 18)",
+    grepl("_unsure_disorder$", status) ~ "Needs review: diagnosis reported",
+    grepl("_unsure_recaptcha$", status) ~ "Possible bot (low reCAPTCHA score)",
+    grepl("_unsure$", status) ~ "Incomplete answers",
+    grepl("_ineligible$", status) ~ "Ineligible",
+    !finished ~ "Didn't finish screener",
+    TRUE ~ "No status recorded")
+
+  # The survey flow sets "eligible (18)" after the reCAPTCHA check, so an
+  # 18-year-old with a low score loses the bot flag; restore it when the score
+  # is in the export.
+  rc <- suppressWarnings(as.numeric(col("Q_RecaptchaScore")))
+  outcome[!is.na(rc) & rc < 0.5 & outcome == "Eligible (child 18)"] <- "Possible bot (low reCAPTCHA score)"
+
+  sid <- .clean_id(col("screenerid"))
+  ok_review <- !is.na(sid) & sid %in% .clean_id(approved) & !screened_out
+  outcome[ok_review & !grepl("^Eligible", outcome)] <- "Not marked eligible, but enrolled"
+
+  # Ineligible reasons, using the same rules as the screener's survey flow
+  age <- .lab(col("age"))
+  age_num <- suppressWarnings(as.integer(age))
+  reasons <- cbind(
+    `Can't attend lab visit at CMU` = .lab(col("attend")) %in% "No",
+    `Child's age outside 14-18` = !is.na(age) & (is.na(age_num) | age_num < 14 | age_num > 18),
+    `Anti-inflammatory / hormonal medication` = .lab(col("medication")) %in% "Yes",
+    `Child not fluent in English` = .lab(col("child_eng")) %in% "No",
+    `Caregiver not fluent in English` = .lab(col("caregiver_eng")) %in% "No",
+    `Pregnant / breastfeeding` = .lab(col("preg")) %in% "Yes",
+    `In prison` = .lab(col("prison")) %in% "Yes")
+  inel <- outcome == "Ineligible"
+  reasons[!inel, ] <- FALSE
+  other <- inel & rowSums(reasons) == 0
+  reasons <- cbind(reasons, `Other / not recorded` = other)
+
+  # Where they heard about us (caregiver and older adolescent versions merged)
+  hv <- grep("^heard\\.where_(car|ado)_[0-9]+$", names(raw), value = TRUE)
+  src_name <- vapply(hv, function(v) .source_name(attr(raw[[v]], "label"), v), "")
+  srcs <- unique(src_name)
+  sources <- vapply(srcs, function(s) {
+    m <- as.matrix(as.data.frame(lapply(hv[src_name == s], function(v) !is.na(raw[[v]]) & as.numeric(raw[[v]]) == 1)))
+    rowSums(m) > 0
+  }, logical(n))
+  if (!is.matrix(sources)) sources <- matrix(sources, nrow = n, dimnames = list(NULL, srcs))
+  tv <- grep("^heard\\.where_(car|ado)_[0-9]+_TEXT$", names(raw), value = TRUE)
+  writein <- do.call(rbind, c(list(data.frame(source = character(), text = character(), row = integer())),
+    lapply(tv, function(v) {
+      txt <- trimws(as.character(raw[[v]]))
+      keep <- which(!is.na(txt) & txt != "")
+      data.frame(source = rep(.source_name(attr(raw[[sub("_TEXT$", "", v)]], "label"), v), length(keep)),
+                 text = txt[keep], row = keep)
+    })))
+
+  # Demographics
+  rv <- grep("^race_[0-9]+$", names(raw), value = TRUE)
+  race <- vapply(rv, function(v) !is.na(raw[[v]]) & as.numeric(raw[[v]]) == 1, logical(n))
+  if (!is.matrix(race)) race <- matrix(race, nrow = n)
+  colnames(race) <- vapply(rv, function(v) sub(".*Selected Choice ", "", attr(raw[[v]], "label") %||% v), "")
+
+  start <- if ("StartDate" %in% names(raw)) raw$StartDate else rep(as.POSIXct(NA), n)
+  out <- tibble::tibble(
+    response_id = as.character(col("ResponseId")),
+    screener_id = sid,
+    date = .wall_date(start),
+    role = .lab(col("role")),
+    finished = finished,
+    screened_out = screened_out,
+    outcome = outcome,
+    eligible = grepl("^Eligible", outcome),
+    age = age,
+    income = .lab(col("income")),
+    race_group = score_race(race))
+  attr(out, "reasons") <- reasons
+  attr(out, "sources") <- sources
+  attr(out, "writein") <- writein
+  attr(out, "race") <- race
+  out
+}
+
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
+# "Where did you hear about us? - Selected Choice Paper flyer (if so, ...)" -> "Paper flyer"
+.source_name <- function(label, fallback = "") {
+  if (is.null(label) || is.na(label)) return(fallback)
+  x <- sub(".*Selected Choice ", "", label)
+  x <- sub("^Where did you hear about us\\? - ", "", x)
+  x <- sub(" - Text$", "", x)
+  x <- sub("\\s*\\(.*$", "", x)
+  x <- sub(",.*$", "", x)
+  x <- trimws(x)
+  if (tolower(x) == "bus ads") x <- "Bus ads"
+  if (tolower(x) == "halloween candy sticker") x <- "Halloween candy sticker"
+  x
+}
+
