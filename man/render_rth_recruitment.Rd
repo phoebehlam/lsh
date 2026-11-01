@@ -14,7 +14,8 @@ render_rth_recruitment(
   study_start = as.Date("2026-04-25"),
   seed_sheet = NULL,
   tracker_tab = "tracking",
-  costs = NULL,
+  costs = FALSE,
+  costs_sheet = NULL,
   costs_tab = "costs",
   hourly_rates = c(`Lab manager` = 21.5 * 1.256, `Grad student` = 30000/520),
   lm_hours_tab = "lab manager hours",
@@ -44,8 +45,11 @@ for lab visits scheduled in weeks before the tracker logged booking dates.}
 
 \item{tracker_tab}{Tab of the tracking sheet to read.}
 
-\item{costs}{Optional: the RTH recruitment costs & hours sheet (Google
-Sheets link or downloaded .xlsx), for the Costs section.}
+\item{costs}{TRUE to add the Costs section (needs \code{costs_sheet});
+FALSE (default) leaves it out of the report entirely.}
+
+\item{costs_sheet}{The RTH recruitment costs & hours sheet (Google Sheets
+link or downloaded .xlsx). Only read when \code{costs = TRUE}.}
 
 \item{costs_tab}{Tab of the costs sheet to read.}
 

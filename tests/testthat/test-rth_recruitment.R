@@ -208,14 +208,19 @@ test_that("cost per step: fractional credit, General only in the total, cheapest
 test_that("report has a Costs section at the end, without printing hourly rates", {
   d <- file.path(tempdir(), "rec_cost"); unlink(d, recursive = TRUE)
   p <- suppressMessages(render_rth_recruitment(rec_ex("sim_prescreen.sav"), rec_ex("sim_tracking.xlsx"), out_dir = d,
-                                               report_date = rd, costs = rec_ex("sim_costs.xlsx")))
+                                               report_date = rd, costs = TRUE, costs_sheet = rec_ex("sim_costs.xlsx")))
   h <- paste(readLines(p, warn = FALSE), collapse = " ")
   for (id in c("costs", "t-util", "t-costweek", "cost-hours", "lm-week")) expect_match(h, sprintf('id="%s"', id))
   expect_true(regexpr('id="daily"', h) < regexpr('id="costs"', h))
   expect_false(grepl("27\\.00|57\\.69|21\\.50", h))
   expect_match(h, 'id="t-util"><thead><tr>.*?</tr><tr class="total"><td>All strategies</td>')
   p0 <- suppressMessages(render_rth_recruitment(rec_ex("sim_prescreen.sav"), rec_ex("sim_tracking.xlsx"), out_dir = d, report_date = rd))
-  expect_match(paste(readLines(p0, warn = FALSE), collapse = " "), "No costs sheet given")
+  h0 <- paste(readLines(p0, warn = FALSE), collapse = " ")
+  expect_false(grepl('id="costs"|href="#costs"', h0))                      # off by default: no section, no link
+  expect_error(render_rth_recruitment(rec_ex("sim_prescreen.sav"), rec_ex("sim_tracking.xlsx"), out_dir = d, report_date = rd,
+                                      costs = TRUE), "needs costs_sheet")
+  expect_error(render_rth_recruitment(rec_ex("sim_prescreen.sav"), rec_ex("sim_tracking.xlsx"), out_dir = d, report_date = rd,
+                                      costs = rec_ex("sim_costs.xlsx")), "TRUE or FALSE")
 })
 
 test_that("lab manager's week: 37.5-hour bar, recruitment from the costs tab, unlogged time white", {

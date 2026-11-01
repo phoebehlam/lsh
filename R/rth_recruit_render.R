@@ -20,8 +20,10 @@
 #' @param seed_sheet Optional: the old weekly counts sheet (.tsv/.csv/.xlsx),
 #'   for lab visits scheduled in weeks before the tracker logged booking dates.
 #' @param tracker_tab Tab of the tracking sheet to read.
-#' @param costs Optional: the RTH recruitment costs & hours sheet (Google
-#'   Sheets link or downloaded .xlsx), for the Costs section.
+#' @param costs TRUE to add the Costs section (needs \code{costs_sheet});
+#'   FALSE (default) leaves it out of the report entirely.
+#' @param costs_sheet The RTH recruitment costs & hours sheet (Google Sheets
+#'   link or downloaded .xlsx). Only read when \code{costs = TRUE}.
 #' @param costs_tab Tab of the costs sheet to read.
 #' @param hourly_rates Hourly cost of staff time, named as in the sheet's
 #'   person column. Lab manager: $21.50/hour plus CMU's FY2027 fringe rate for
@@ -37,12 +39,16 @@
 render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, out_dir = ".",
                                    week = NULL, report_date = Sys.Date(),
                                    study_start = as.Date("2026-04-25"), seed_sheet = NULL,
-                                   tracker_tab = "tracking", costs = NULL, costs_tab = "costs",
+                                   tracker_tab = "tracking", costs = FALSE, costs_sheet = NULL, costs_tab = "costs",
                                    hourly_rates = c("Lab manager" = 21.50 * 1.256, "Grad student" = 30000 / 520),
                                    lm_hours_tab = "lab manager hours", lm_week_hours = 37.5) {
   study_start <- as.Date(study_start); report_date <- as.Date(report_date)
   for (f in c(screener_sav, interview_sav, seed_sheet))
     if (!file.exists(f)) stop("File not found: ", f, call. = FALSE)
+  if (!is.logical(costs) || length(costs) != 1 || is.na(costs))
+    stop("costs should be TRUE or FALSE. Put the costs sheet link in costs_sheet.", call. = FALSE)
+  if (costs && is.null(costs_sheet))
+    stop("costs = TRUE needs costs_sheet: the link to the costs & hours Google Sheet (or a downloaded .xlsx).", call. = FALSE)
   if (is.null(week)) week <- rth_study_week(report_date, study_start) - 1L
   if (week < 1) stop("The report week is before week 1; check study_start and report_date.", call. = FALSE)
 
@@ -54,8 +60,11 @@ render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, 
 
   steps <- link_steps(scr, fam)
   wk_tab <- weekly_counts(scr, fam, study_start, week, seed)
-  cs <- if (!is.null(costs)) cost_summary(read_costs(costs, costs_tab, hourly_rates), scr, steps, week, study_start) else NULL
-  if (!is.null(cs)) { cs$lmh <- read_lm_hours(costs, lm_hours_tab); cs$week_hours <- lm_week_hours }
+  cs <- NULL
+  if (isTRUE(costs)) {
+    cs <- cost_summary(read_costs(costs_sheet, costs_tab, hourly_rates), scr, steps, week, study_start)
+    cs$lmh <- read_lm_hours(costs_sheet, lm_hours_tab); cs$week_hours <- lm_week_hours
+  }
   html <- recruitment_html(scr = scr, tr = tr, fam = fam, ses = ses, steps = steps, wk_tab = wk_tab,
                            week = week, study_start = study_start, report_date = report_date, cs = cs)
   dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
@@ -293,8 +302,10 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
 <a href="#conv">Conversion</a><a class="sub" href="#conv-week">By week</a><a class="sub" href="#conv-src">By source</a>
 <a href="#sources">Sources</a><a class="sub" href="#src-chart">By week (chart)</a><a class="sub" href="#src-week">By week (table)</a>
 <a href="#demo">Demographics</a><a class="sub" href="#demo-scr">Screener</a><a class="sub" href="#demo-enr">Enrolled</a>
-<a href="#daily">Daily assessments</a>
-<a href="#costs">Costs</a><a class="sub" href="#cost-util">By source</a><a class="sub" href="#cost-weeks">By week</a><a class="sub" href="#cost-hours">Recruitment hours</a><a class="sub" href="#lm-week">Lab manager&rsquo;s week</a></nav>'
+<a href="#daily">Daily assessments</a>'
+  if (!is.null(cs)) nav <- paste0(nav, '
+<a href="#costs">Costs</a><a class="sub" href="#cost-util">By source</a><a class="sub" href="#cost-weeks">By week</a><a class="sub" href="#cost-hours">Recruitment hours</a><a class="sub" href="#lm-week">Lab manager&rsquo;s week</a>')
+  nav <- paste0(nav, '</nav>')
 
   paste0('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
     sprintf('<title>RTH recruitment, week %d</title><style>%s</style></head><body>', week, css), nav, '<main>',
@@ -328,9 +339,7 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
     .demo_html("Child&rsquo;s age", dm$age), .demo_html("Race/ethnicity", dm$race), .demo_html("Household income", dm$income),
     '</div><h3 id="demo-enr">Enrolled (did the lab visit)</h3>', enrolled,
     '<h2 id="daily">Daily assessments</h2>', daily,
-    '<h2 id="costs">Costs</h2>',
-    if (is.null(cs)) '<p class="note">No costs sheet given (add <code>costs = </code> the costs &amp; hours sheet link).</p>'
-    else cost_html(cs, week, wl, cs$lmh, study_start, cs$week_hours),
+    if (!is.null(cs)) paste0('<h2 id="costs">Costs</h2>', cost_html(cs, week, wl, cs$lmh, study_start, cs$week_hours)),
     '</main><script>', .sort_js, '</script></body></html>')
 }
 
