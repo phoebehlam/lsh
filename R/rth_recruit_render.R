@@ -113,17 +113,17 @@ render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, 
           if (is.null(foot)) "" else sprintf('<tr class="total">%s</tr>', foot), paste(body, collapse = ""))
 }
 .conv_cells <- function(r) paste0(
-  .td(r$screeners_all), .td(r$bots), .td(r$screeners), .pct_td(r$pct_eligible, r$eligible), .pct_td(r$pct_consent, r$consent),
+  .td(r$screeners_all), .td(r$screeners), .pct_td(r$pct_eligible, r$eligible), .pct_td(r$pct_consent, r$consent),
   .pct_td(r$pct_interview, r$interview), .pct_td(r$pct_survey, r$survey), .pct_td(r$pct_sched, r$sched),
   .pct_td(r$pct_lab, r$lab))
-.conv_head <- c("All screeners", "Possible bots", "Completed screeners", "Eligible", "Caregiver consent", "Caregiver interview", "Caregiver survey",
+.conv_head <- c("All screeners", "Completed screeners", "Eligible", "Caregiver consent", "Caregiver interview", "Caregiver survey",
                 "Lab visit scheduled", "Lab visit done")
 
 # Okabe-Ito colors: easy to tell apart, colorblind-safe
 .src_cols <- c("#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9", "#9CA3AF")
 
 plot_source_weeks <- function(scr, sw, weeks, top) {
-  keep <- !scr$screened_out
+  keep <- scr$completed
   src <- attr(scr, "sources")[keep, , drop = FALSE]; w <- sw[keep]
   grp <- c(top, "Remaining sources")
   d <- do.call(rbind, lapply(weeks, function(k) {
@@ -137,7 +137,7 @@ plot_source_weeks <- function(scr, sw, weeks, top) {
     ggplot2::scale_fill_manual(values = stats::setNames(rev(.src_cols[seq_along(grp)]), rev(grp)),
                                breaks = grp, name = NULL) +
     ggplot2::guides(fill = ggplot2::guide_legend(nrow = 1)) +
-    ggplot2::labs(x = "Study week", y = "Screeners (by source)") +
+    ggplot2::labs(x = "Study week", y = "Completed screeners (by source)") +
     ggplot2::theme_minimal(base_size = 9) +
     ggplot2::theme(legend.position = "top", panel.grid.major.x = ggplot2::element_blank(),
                    panel.grid.minor = ggplot2::element_blank())
@@ -228,7 +228,7 @@ plot_completion <- function(ct) {
   g <- intersect(unique(unname(groups)), shown)
   txt <- vapply(g, function(k) sprintf("<b>%s</b> = %s", .esc(k), .esc(paste(names(groups)[groups == k], collapse = ", "))), "")
   paste0('<p class="note">', if (length(txt)) paste0(paste(txt, collapse = "; "), " (a family who picked more than one of these counts once). ") else "",
-         'Counts are of all screeners, including unfinished ones and possible bots.</p>')
+         'All counts in this section are of <b>completed screeners only</b> (finished, not a possible bot).</p>')
 }
 
 .count_bars <- function(x, total) {
@@ -269,7 +269,7 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
     sprintf("Caregiver interviews: %d; caregiver surveys: %d", this$cg_interview, this$cg_survey),
     sprintf("Lab visits scheduled (booked this week): %s; lab visits done: %d; upcoming lab visits: %d",
             if (is.na(this$lab_sched)) "not tracked yet" else this$lab_sched, this$lab_done, upcoming),
-    if (length(top_w)) sprintf("Top source: %s (%d of %d screeners)", names(top_w)[1], top_w[[1]], this$screeners_all)
+    if (length(top_w)) sprintf("Top source: %s (%d of %d completed screeners)", names(top_w)[1], top_w[[1]], this$screeners)
     else "Top source: none reported")
 
   # All weeks (newest first; totals at the top) ----
@@ -277,12 +277,12 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
   na0 <- function(v) ifelse(is.na(v), "&ndash;", v)
   body <- vapply(seq_len(nrow(wt)), function(i) {
     r <- wt[i, ]
-    paste0("<tr>", .wk_cell(r$week, wl), .td(r$screeners_all), .td(r$bots), .td(r$screeners), .td(r$eligible), .td(r$cg_consent),
+    paste0("<tr>", .wk_cell(r$week, wl), .td(r$screeners_all), .td(r$screeners), .td(r$eligible), .td(r$cg_consent),
            .td(r$cg_interview), .td(r$cg_survey), .td(r$lab_sched, na0(r$lab_sched)), .td(r$lab_done), "</tr>")
   }, "")
-  tot <- c(sum(wt$screeners_all), sum(wt$bots), sum(wt$screeners), sum(wt$eligible), sum(wt$cg_consent), sum(wt$cg_interview), sum(wt$cg_survey),
+  tot <- c(sum(wt$screeners_all), sum(wt$screeners), sum(wt$eligible), sum(wt$cg_consent), sum(wt$cg_interview), sum(wt$cg_survey),
            sum(wt$lab_sched, na.rm = TRUE), sum(wt$lab_done))
-  weekly <- .table("t-weekly", c("Week", "All screeners", "Possible bots", "Completed screeners", "Eligible", "Caregiver consent", "Caregiver interview",
+  weekly <- .table("t-weekly", c("Week", "All screeners", "Completed screeners", "Eligible", "Caregiver consent", "Caregiver interview",
                                  "Caregiver survey", "Lab visits scheduled", "Lab visits done"), body,
                    paste0("<td>Total</td>", paste0("<td>", tot, "</td>", collapse = "")))
 
@@ -307,7 +307,7 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
   top <- utils::head(setdiff(names(src_a), "No source given"), 5)
   chart <- if (length(top)) img_tag(plot_source_weeks(scr, sw, max(1, week - 11):week, top), height = 3, width = 9,
                                     alt = "Screeners by week and source") else '<p class="note">No sources reported yet.</p>'
-  srcm <- attr(scr, "sources")[ns, , drop = FALSE]; swn <- sw[ns]
+  srcm <- attr(scr, "sources")[scr$completed, , drop = FALSE]; swn <- sw[scr$completed]
   vrow <- function(s) c(colSums(s[, top, drop = FALSE]), sum(s[, setdiff(colnames(s), top), drop = FALSE]), sum(rowSums(s) == 0))
   wks <- rev(sort(unique(stats::na.omit(swn[swn <= week]))))
   body <- vapply(wks, function(k) paste0("<tr>", .wk_cell(k, wl), paste(.td(vrow(srcm[!is.na(swn) & swn == k, , drop = FALSE])), collapse = ""), "</tr>"), "")
@@ -386,8 +386,8 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
     '<h2 id="sources">Sources</h2>', .groups_note(groups, colnames(attr(scr, "sources"))),
     sprintf('<div class="two"><div><h3>This week</h3>%s</div><div><h3>All time</h3>%s</div></div>',
             .bars(src_w, "No screeners this week."), .bars(src_a, "No screeners yet.")),
-    '<h3 id="src-chart">Screeners by week and source (last 12 weeks)</h3>', chart,
-    '<h3 id="src-week">Screeners by source, each week</h3>', src_tab, writein,
+    '<h3 id="src-chart">Completed screeners by week and source (last 12 weeks)</h3>', chart,
+    '<h3 id="src-week">Completed screeners by source, each week</h3>', src_tab, writein,
     '<h2 id="demo">Demographics</h2>',
     sprintf('<h3 id="demo-scr">Screener (all time)</h3><p class="note">Finished screeners: %d eligible, %d not eligible. Bars show the %% of each group.</p>',
             dm$n_eligible, dm$n_not_eligible),

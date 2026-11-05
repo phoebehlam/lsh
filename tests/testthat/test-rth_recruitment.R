@@ -364,6 +364,13 @@ test_that("all screeners vs completed screeners; every % starts from completed",
   p <- suppressMessages(render_rth_recruitment(rec_ex("sim_prescreen.sav"), rec_ex("sim_tracking.xlsx"), out_dir = d, report_date = rd))
   h <- paste(readLines(p, warn = FALSE), collapse = " ")
   for (tb in c("t-weekly", "t-conv", "t-convw"))
-    expect_match(h, sprintf('id="%s"><thead><tr>.*?All screeners.*?Possible bots.*?Completed screeners', tb))
+    expect_match(h, sprintf('id="%s"><thead><tr>(?:(?!</tr>).)*All screeners(?:(?!</tr>).)*Completed screeners', tb), perl = TRUE)
+  expect_false(grepl("<th[^>]*>Possible bots", h))                        # bots only in the This week list and note
+  # sources: completed screeners only
+  sc <- source_counts(s)
+  src <- attr(s, "sources")
+  expect_equal(sc[["Facebook"]], sum(src[s$completed, "Facebook"]))
+  expect_equal(sum(sc[names(sc) == "No source given"]), sum(s$completed & rowSums(src) == 0))
+  expect_match(h, "completed screeners only")
   expect_match(h, "<b>Local recruitment</b> = Paper flyer, Mail, Bus ads, Halloween candy sticker, Candy / Gatorade Sticker")
 })

@@ -225,8 +225,9 @@ reason_counts <- function(scr, sel = rep(TRUE, nrow(scr))) {
   sort(x, decreasing = TRUE)
 }
 
+# Completed screeners only (finished, not blocked, not a possible bot)
 source_counts <- function(scr, sel = rep(TRUE, nrow(scr))) {
-  sel <- sel & !scr$screened_out
+  sel <- sel & scr$completed
   src <- attr(scr, "sources")[sel, , drop = FALSE]
   x <- colSums(src)
   none <- sum(rowSums(src) == 0)
