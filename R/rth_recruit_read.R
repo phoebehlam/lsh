@@ -47,8 +47,14 @@ rth_study_week <- function(date, study_start) {
 .week_start <- function(week, study_start) as.Date(study_start) + 7 * (week - 1)
 .week_label <- function(week, study_start) {
   s <- .week_start(week, study_start)
-  sprintf("%s&ndash;%s", format(s, "%-m/%-d"), format(s + 6, "%-m/%-d"))
+  sprintf("%s&ndash;%s", .md(s), .md(s + 6))
 }
+# 10/4 and Oct 4, 2026 without leading zeros. ("%-d" works on Linux but not in
+# R on macOS, so build them by hand.)
+.md <- function(d) ifelse(is.na(d), NA_character_,
+                          paste0(as.integer(format(d, "%m")), "/", as.integer(format(d, "%d"))))
+.long_date <- function(d) ifelse(is.na(d), NA_character_,
+                                 paste0(format(d, "%b"), " ", as.integer(format(d, "%d")), ", ", format(d, "%Y")))
 
 #' Read the Rise to Health prescreen (screener) export
 #'
@@ -77,6 +83,7 @@ read_screener <- function(path, approved = character()) {
     grepl("_eligible_18$", status) ~ "Eligible (child 18)",
     grepl("_unsure_disorder$", status) ~ "Needs review: diagnosis reported",
     grepl("_unsure_recaptcha$", status) ~ "Possible bot (low reCAPTCHA score)",
+    grepl("_unsure_duplicate$", status) ~ "Needs review: possible repeat screener",
     grepl("_unsure$", status) ~ "Incomplete answers",
     grepl("_ineligible$", status) ~ "Ineligible",
     !finished ~ "Didn't finish screener",
@@ -89,7 +96,8 @@ read_screener <- function(path, approved = character()) {
   outcome[!is.na(rc) & rc < 0.5 & outcome == "Eligible (child 18)"] <- "Possible bot (low reCAPTCHA score)"
 
   sid <- .clean_id(col("screenerid"))
-  ok_review <- !is.na(sid) & sid %in% .clean_id(approved) & !screened_out
+  rid <- as.character(col("ResponseId"))
+  ok_review <- ((!is.na(sid) & sid %in% .clean_id(approved)) | (!is.na(rid) & rid %in% .clean_id(approved))) & !screened_out
   outcome[ok_review & !grepl("^Eligible", outcome)] <- "Not marked eligible, but enrolled"
 
   # Ineligible reasons, using the same rules as the screener's survey flow
@@ -123,7 +131,7 @@ read_screener <- function(path, approved = character()) {
       txt <- trimws(as.character(raw[[v]]))
       keep <- which(!is.na(txt) & txt != "")
       data.frame(source = rep(.source_name(attr(raw[[sub("_TEXT$", "", v)]], "label"), v), length(keep)),
-                 text = txt[keep], row = keep)
+                 text = .scrub_contact(txt[keep]), row = keep)
     })))
 
   # Demographics
@@ -141,10 +149,11 @@ read_screener <- function(path, approved = character()) {
     finished = finished,
     screened_out = screened_out,
     outcome = outcome,
-    eligible = grepl("^Eligible", outcome),
+    eligible = grepl("^Eligible", outcome) | outcome == "Not marked eligible, but enrolled",
     age = age,
     income = .lab(col("income")),
-    race_group = score_race(race))
+    race_group = score_race(race),
+    recaptcha = rc)
   attr(out, "reasons") <- reasons
   attr(out, "sources") <- sources
   attr(out, "writein") <- writein
@@ -168,3 +177,39 @@ read_screener <- function(path, approved = character()) {
   x
 }
 
+
+# Source groups -----------------------------------------------------------------------
+
+.rth_source_groups <- c("Paper flyer" = "Local recruitment", "Mail" = "Local recruitment",
+                        "Bus ads" = "Local recruitment", "Halloween candy sticker" = "Local recruitment",
+                        "Candy / Gatorade Sticker" = "Local recruitment")
+
+# Rename sources to their group (names matched loosely); others stay as they are
+.map_source <- function(x, groups) {
+  if (!length(groups)) return(x)
+  g <- unname(groups[match(.key(x), .key(names(groups)))])
+  ifelse(is.na(g), x, g)
+}
+
+# Combine the screener's source columns into groups: a family that picked
+# Mail and Paper flyer counts once for Local recruitment
+.group_sources <- function(scr, groups) {
+  src <- attr(scr, "sources")
+  if (!length(groups) || !ncol(src)) return(scr)
+  grp <- .map_source(colnames(src), groups)
+  out <- vapply(unique(grp), function(g) rowSums(src[, grp == g, drop = FALSE]) > 0, logical(nrow(src)))
+  if (!is.matrix(out)) out <- matrix(out, nrow = nrow(src), dimnames = list(NULL, unique(grp)))
+  attr(scr, "sources") <- out
+  scr
+}
+
+# Write-ins can contain contact details (e.g. "referred by <name> <email>"):
+# never let emails, phone numbers or web/social handles reach the report
+.scrub_contact <- function(x) {
+  x <- gsub("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "[email removed]", x, perl = TRUE)
+  x <- gsub("(\\+?1[ .-]?)?\\(?[0-9]{3}\\)?[ .-]?[0-9]{3}[ .-]?[0-9]{4}", "[phone removed]", x, perl = TRUE)
+  x <- gsub("(^|\\s)@[A-Za-z0-9._]{2,}", "\\1[handle removed]", x, perl = TRUE)
+  # "referred (to) by / from Jane Doe" -> "referred (to) by [name removed]"
+  gsub("(?i)(refer+ed(?:\\s+to)?\\s+(?:by|from)\\s+)(?!\\[)(?!a friend|my |friend|family)[A-Za-z'.-]+(?:\\s+(?!\\[)[A-Za-z'.-]+)?",
+       "\\1[name removed]", x, perl = TRUE)
+}

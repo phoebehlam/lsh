@@ -66,12 +66,21 @@ link_steps <- function(scr, fam) {
   m2 <- match(scr$response_id, linked$screener_id)
   m[is.na(m)] <- m2[is.na(m)]
   has <- function(v) !is.na(m) & !is.na(linked[[v]][m])
-  tibble::tibble(family = linked$family[m], consent = has("consent"), interview = has("interview"),
-                 survey = has("cg_survey"), lab = !is.na(m) & linked$lab_done[m] %in% TRUE)
+  # Any later step means the family consented, and a lab visit means it was
+  # scheduled, even if that date is missing in the tracker (missing consent
+  # dates are listed in the checks). So no % can go over 100.
+  lab <- !is.na(m) & linked$lab_done[m] %in% TRUE
+  sched <- has("lab_sched") | has("lab_date") | lab
+  survey <- has("cg_survey")
+  interview <- has("interview")
+  consent <- has("consent") | interview | survey | sched
+  tibble::tibble(family = linked$family[m], consent = consent, interview = interview,
+                 survey = survey, sched = sched, lab = lab)
 }
 
-# One conversion row: counts and % of the step before (interview, survey and
-# lab visit are out of caregiver consents)
+# One conversion row: counts and %. Eligible is out of screeners, consent out of
+# eligible; interview, survey and lab visit scheduled out of consents; lab visit
+# done out of lab visits scheduled.
 .conv_row <- function(sel, s, st) {
   sc <- sum(sel); el <- sum(sel & s$eligible); cc <- sum(sel & st$consent)
   pc <- function(n, d) if (d) 100 * n / d else NA
@@ -79,7 +88,8 @@ link_steps <- function(scr, fam) {
        consent = cc, pct_consent = pc(cc, el),
        interview = sum(sel & st$interview), pct_interview = pc(sum(sel & st$interview), cc),
        survey = sum(sel & st$survey), pct_survey = pc(sum(sel & st$survey), cc),
-       lab = sum(sel & st$lab), pct_lab = pc(sum(sel & st$lab), cc))
+       sched = sum(sel & st$sched), pct_sched = pc(sum(sel & st$sched), cc),
+       lab = sum(sel & st$lab), pct_lab = pc(sum(sel & st$lab), sum(sel & st$sched)))
 }
 
 #' Conversion by source, all time
@@ -92,6 +102,7 @@ source_conversion <- function(scr, steps) {
   none <- rowSums(src) == 0
   if (any(none)) rows <- c(rows, list(c(list(source = "No source given"), .conv_row(none, s, st))))
   out <- dplyr::bind_rows(rows)
+  if (nrow(out)) out <- out[out$screeners > 0, , drop = FALSE]          # choices nobody picked
   if (nrow(out)) out <- out[order(-out$screeners), , drop = FALSE]
   attr(out, "total") <- .conv_row(rep(TRUE, nrow(s)), s, st)
   out
@@ -138,8 +149,6 @@ tracker_checks <- function(scr, tr, fam, steps, report_date, wait_days = 14, dia
         sprintf("%s (RTH %s)", fam$screener_id, vapply(fam$family, function(f) paste(fid(f), collapse = "/"), ""))[
           !is.na(fam$screener_id) & !fam$screener_id %in% known],
         "Usually a typo.")
-    dup <- fam$screener_id[!is.na(fam$screener_id) & duplicated(fam$screener_id)]
-    add("Screener IDs used for more than one family", unique(dup))
   } else {
     add("The tracker has no 'screener ID' column yet", "add the column", "Sources can't be linked to consents and lab visits until it's added.")
   }
@@ -158,6 +167,9 @@ tracker_checks <- function(scr, tr, fam, steps, report_date, wait_days = 14, dia
     (!is.na(fam$cg_survey) & fam$cg_survey > report_date)
   add("Consent, interview or caregiver survey date is in the future", fid(fam$family[fut]),
       "Usually a typo (future lab visit dates are fine).")
+  later <- !is.na(fam$interview) | !is.na(fam$cg_survey) | !is.na(fam$lab_sched) | !is.na(fam$lab_date)
+  add("Interview, survey or lab visit date but no consent date", fid(fam$family[later & is.na(fam$consent)]),
+      "The report counts them as consented anyway; please fill in the consent date.")
   add("Interview date is before the consent date",
       fid(fam$family[!is.na(fam$consent) & !is.na(fam$interview) & fam$interview < fam$consent]))
   if (isTRUE(has[["lab_sched_date"]]) && any(!is.na(fam$lab_sched))) {
@@ -190,13 +202,16 @@ completion_table <- function(tr, report_date) {
 # Outcomes, reasons, sources, demographics ---------------------------------------------
 
 .outcome_levels <- c("Eligible (child 14-17)", "Eligible (child 18)", "Not marked eligible, but enrolled",
-                     "Needs review: diagnosis reported", "Possible bot (low reCAPTCHA score)",
+                     "Needs review: diagnosis reported", "Needs review: possible repeat screener",
+                     "Possible bot (low reCAPTCHA score)",
                      "Incomplete answers", "Ineligible", "Didn't finish screener",
                      "No status recorded", "Screened out (blocked IP/location)")
 
 outcome_counts <- function(scr, sel = rep(TRUE, nrow(scr))) {
   t <- table(factor(scr$outcome[sel], levels = .outcome_levels))
-  t <- t[t > 0 | names(t) %in% .outcome_levels[c(1, 2, 4:7)]]
+  always <- c("Eligible (child 14-17)", "Eligible (child 18)", "Needs review: diagnosis reported",
+              "Possible bot (low reCAPTCHA score)", "Incomplete answers", "Ineligible")
+  t <- t[t > 0 | names(t) %in% always]
   stats::setNames(as.integer(t), names(t))
 }
 

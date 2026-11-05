@@ -34,6 +34,10 @@
 #' @param lm_hours_tab Tab of the costs sheet where the lab manager logs his
 #'   other hours, for the "Lab manager's week" bar.
 #' @param lm_week_hours Hours in the lab manager's full work week.
+#' @param source_groups Screener sources to report together, as
+#'   c("screener choice" = "group"). Default: paper flyers, mail, bus ads and
+#'   the candy stickers are grouped as "Local recruitment" (in the costs
+#'   section too). Use \code{character()} to report every choice separately.
 #' @return Path to the HTML report (invisibly).
 #' @export
 render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, out_dir = ".",
@@ -41,7 +45,8 @@ render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, 
                                    study_start = as.Date("2026-04-25"), seed_sheet = NULL,
                                    tracker_tab = "tracking", costs = FALSE, costs_sheet = NULL, costs_tab = "costs",
                                    hourly_rates = c("Lab manager" = 21.50 * 1.256, "Grad student" = 30000 / 520),
-                                   lm_hours_tab = "lab manager hours", lm_week_hours = 37.5) {
+                                   lm_hours_tab = "lab manager hours", lm_week_hours = 37.5,
+                                   source_groups = .rth_source_groups) {
   study_start <- as.Date(study_start); report_date <- as.Date(report_date)
   for (f in c(screener_sav, interview_sav, seed_sheet))
     if (!file.exists(f)) stop("File not found: ", f, call. = FALSE)
@@ -54,7 +59,7 @@ render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, 
 
   tr <- read_tracker(tracker, tracker_tab)
   fam <- tracker_families(tr, report_date)
-  scr <- read_screener(screener_sav, approved = fam$screener_id[!is.na(fam$consent)])
+  scr <- .group_sources(read_screener(screener_sav, approved = fam$screener_id), source_groups)
   ses <- if (!is.null(interview_sav)) read_interview_ses(interview_sav) else NULL
   seed <- if (!is.null(seed_sheet)) read_seed_sheet(seed_sheet) else NULL
 
@@ -62,7 +67,9 @@ render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, 
   wk_tab <- weekly_counts(scr, fam, study_start, week, seed)
   cs <- NULL
   if (isTRUE(costs)) {
-    cs <- cost_summary(read_costs(costs_sheet, costs_tab, hourly_rates), scr, steps, week, study_start)
+    cst <- read_costs(costs_sheet, costs_tab, hourly_rates)
+    cst$source <- .map_source(cst$source, source_groups)
+    cs <- cost_summary(cst, scr, steps, week, study_start)
     cs$lmh <- read_lm_hours(costs_sheet, lm_hours_tab); cs$week_hours <- lm_week_hours
   }
   html <- recruitment_html(scr = scr, tr = tr, fam = fam, ses = ses, steps = steps, wk_tab = wk_tab,
@@ -106,8 +113,10 @@ render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, 
 }
 .conv_cells <- function(r) paste0(
   .td(r$screeners), .pct_td(r$pct_eligible, r$eligible), .pct_td(r$pct_consent, r$consent),
-  .pct_td(r$pct_interview, r$interview), .pct_td(r$pct_survey, r$survey), .pct_td(r$pct_lab, r$lab))
-.conv_head <- c("Screeners", "Eligible", "Caregiver consent", "Caregiver interview", "Caregiver survey", "Lab visit done")
+  .pct_td(r$pct_interview, r$interview), .pct_td(r$pct_survey, r$survey), .pct_td(r$pct_sched, r$sched),
+  .pct_td(r$pct_lab, r$lab))
+.conv_head <- c("Screeners", "Eligible", "Caregiver consent", "Caregiver interview", "Caregiver survey",
+                "Lab visit scheduled", "Lab visit done")
 
 # Okabe-Ito colors: easy to tell apart, colorblind-safe
 .src_cols <- c("#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9", "#9CA3AF")
@@ -138,23 +147,37 @@ plot_source_weeks <- function(scr, sw, weeks, top) {
 plot_completion <- function(ct) {
   labs <- c(night = "Teen night diaries", morning = "Teen morning diaries", food = "Food photos",
             watch = "Watch nights worn", cg_night = "Caregiver night diaries")
-  d <- do.call(rbind, lapply(names(labs), function(v)
-    data.frame(measure = labs[[v]], days = ct[[v]][!is.na(ct[[v]])])))
-  if (!nrow(d)) return(NULL)
-  d$measure <- factor(d$measure, levels = labs)
+  d <- do.call(rbind, lapply(names(labs), function(v) {
+    x <- ct[[v]][!is.na(ct[[v]])]
+    if (!length(x)) return(NULL)
+    t <- table(x)
+    data.frame(measure = labs[[v]], days = as.numeric(names(t)), n = as.integer(t))
+  }))
+  if (is.null(d) || !nrow(d)) return(NULL)
+  # one row per measure (first at the top), one circle per number of days
+  d$row <- match(d$measure, rev(labs))
   d$hit <- ifelse(d$days >= 12, "12 or more days", "Fewer than 12 days")
-  ggplot2::ggplot(d, ggplot2::aes(days, fill = hit)) +
-    ggplot2::geom_bar(width = .8) +
-    ggplot2::geom_vline(xintercept = 11.5, linetype = "dashed", colour = "#6B7280", linewidth = .3) +
-    ggplot2::scale_fill_manual(values = c(`12 or more days` = "#334155", `Fewer than 12 days` = "#CBD5E1"), name = NULL) +
-    ggplot2::scale_x_continuous(limits = c(-0.5, 15.5), breaks = c(0, 5, 10, 12, 15)) +
-    ggplot2::scale_y_continuous(breaks = function(l) unique(floor(pretty(seq(0, max(l[2], 1)))))) +
-    ggplot2::facet_wrap(~measure, ncol = 3, drop = FALSE) +
-    ggplot2::labs(x = "Days completed (out of 15)", y = "Participants") +
+  nmax <- max(d$n)
+  ggplot2::ggplot(d, ggplot2::aes(days, row)) +
+    ggplot2::annotate("rect", xmin = 11.5, xmax = 15.5, ymin = 0.5, ymax = length(labs) + 0.5, fill = "#ECFDF5") +
+    ggplot2::geom_hline(yintercept = seq(1.5, length(labs) - 0.5), colour = "#D1D5DB", linewidth = .3) +
+    ggplot2::geom_point(ggplot2::aes(size = n, fill = hit), shape = 21, colour = "white", stroke = .4) +
+    ggplot2::geom_text(ggplot2::aes(label = n, colour = hit), size = 2.6, fontface = "bold", show.legend = FALSE) +
+    ggplot2::scale_fill_manual(values = c(`12 or more days` = "#334155", `Fewer than 12 days` = "#94A3B8"), name = NULL) +
+    ggplot2::scale_colour_manual(values = c(`12 or more days` = "white", `Fewer than 12 days` = "white")) +
+    ggplot2::scale_size_continuous(range = c(4.6, if (nmax > 1) 9 else 4.6), limits = c(1, max(2, nmax)), guide = "none") +
+    ggplot2::scale_x_continuous(limits = c(-0.5, 15.5), breaks = 0:15, expand = c(0, 0)) +
+    ggplot2::scale_y_continuous(limits = c(0.5, length(labs) + 0.5), breaks = seq_along(labs), labels = rev(labs), expand = c(0, 0)) +
+    ggplot2::labs(x = "Days completed (out of 15); shaded = 12 or more", y = NULL,
+                  caption = "Number in each circle = participants who completed that many days") +
+    ggplot2::guides(fill = ggplot2::guide_legend(override.aes = list(size = 4))) +
     ggplot2::theme_minimal(base_size = 9) +
-    ggplot2::theme(legend.position = "top", panel.grid.minor = ggplot2::element_blank(),
-                   panel.grid.major.x = ggplot2::element_blank(),
-                   strip.text = ggplot2::element_text(face = "bold", hjust = 0))
+    ggplot2::theme(legend.position = "top", legend.justification = "left",
+                   panel.grid = ggplot2::element_blank(),
+                   panel.border = ggplot2::element_rect(colour = "#9CA3AF", fill = NA, linewidth = .4),
+                   axis.ticks.x = ggplot2::element_line(colour = "#9CA3AF", linewidth = .3),
+                   axis.text.y = ggplot2::element_text(size = 9, colour = "#1F2937"),
+                   plot.caption = ggplot2::element_text(colour = "#6B7280", hjust = 0))
 }
 
 .demo_html <- function(title, t) {
@@ -178,6 +201,21 @@ plot_completion <- function(ct) {
             if (nzchar(c$help)) sprintf(' <span class="note">%s</span>', c$help) else "", ids)
   }, "")
   sprintf('<ul class="checks">%s</ul>', paste(items, collapse = ""))
+}
+
+# Low reCAPTCHA scores across all outcomes. The screener only gives the
+# "possible bot" status to otherwise-eligible caregivers, so most low scores
+# end up under Ineligible, Didn't finish, etc.
+.recaptcha_note <- function(scr, in_week, cut = 0.5) {
+  rc <- scr$recaptcha; ok <- !scr$screened_out
+  if (all(is.na(rc[ok]))) return('<p class="note">reCAPTCHA scores: not in this export.</p>')
+  low <- ok & !is.na(rc) & rc < cut
+  by <- sort(table(scr$outcome[low]), decreasing = TRUE)
+  sprintf(paste0('<p class="note"><b>Low reCAPTCHA score (below %.1f), whatever the outcome:</b> %d this week, %d all time ',
+                 '(of %d screeners with a score)%s. Only otherwise-eligible caregivers get the &ldquo;Possible bot&rdquo; status, ',
+                 'so most low scores show up under the other outcomes.</p>'),
+          cut, sum(low & in_week), sum(low), sum(ok & !is.na(rc)),
+          if (length(by)) paste0("; all time by outcome: ", paste(sprintf("%s %d", .esc(names(by)), as.integer(by)), collapse = ", ")) else "")
 }
 
 .count_bars <- function(x, total) {
@@ -208,8 +246,9 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
   facts <- c(
     sprintf("Screeners: %d%s", this$screeners,
             if (length(prev)) sprintf(" (average of previous %d weeks: %.0f)", length(prev), mean(prev)) else ""),
-    sprintf("Eligible: %d; needs review (diagnosis reported): %d", this$eligible,
-            sum(in_week & scr$outcome == "Needs review: diagnosis reported")),
+    sprintf("Eligible: %d; needs review (diagnosis reported): %d; needs review (possible repeat screener): %d", this$eligible,
+            sum(in_week & scr$outcome == "Needs review: diagnosis reported"),
+            sum(in_week & scr$outcome == "Needs review: possible repeat screener")),
     sprintf("Caregiver consents: %d", this$cg_consent),
     sprintf("Caregiver interviews: %d; caregiver surveys: %d", this$cg_interview, this$cg_survey),
     sprintf("Lab visits scheduled (booked this week): %s; lab visits done: %d; upcoming lab visits: %d",
@@ -234,6 +273,7 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
   # Screening outcomes and reasons ----
   out_w <- outcome_counts(scr, in_week); out_a <- outcome_counts(scr)
   rs_w <- reason_counts(scr, in_week); rs_a <- reason_counts(scr)
+  bot <- .recaptcha_note(scr, in_week)
 
   # Conversion ----
   wc <- weekly_conversion(scr, steps, study_start, rev(wk_tab$week))
@@ -281,7 +321,7 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
                  summ(ct$food, "Food photos"), summ(ct$watch, "Watch nights worn"), summ(ct$cg_night, "Caregiver night diaries"))
     p <- plot_completion(ct)
     paste0(sprintf('<p class="note">Teens who did the lab visit: %d. Out of 15 days.</p><ul class="facts">%s</ul>', nrow(ct), li),
-           if (is.null(p)) "" else img_tag(p, height = 4, width = 9, alt = "Daily assessment completion"))
+           if (is.null(p)) "" else img_tag(p, height = 3.4, width = 9, alt = "Daily assessment completion"))
   }
 
   # Demographics ----
@@ -311,7 +351,7 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
     sprintf('<title>RTH recruitment, week %d</title><style>%s</style></head><body>', week, css), nav, '<main>',
     '<h1>Rise to Health recruitment report</h1>',
     sprintf('<p class="meta">Report run %s &middot; latest screener %s &middot; tracking sheet: %d people in %d families &middot; weeks run Saturday&ndash;Friday</p>',
-            format(report_date, "%b %-d, %Y"), if (any(!is.na(scr$date))) format(max(scr$date, na.rm = TRUE), "%b %-d, %Y") else "none",
+            .long_date(report_date), if (any(!is.na(scr$date))) .long_date(max(scr$date, na.rm = TRUE)) else "none",
             sum(!is.na(tr$rth_id)), nrow(fam)),
     '<h2 id="checks">Tracker checks</h2>', checks,
     sprintf('<h2 id="week">This week (Week %d: %s)</h2><ul class="facts">%s</ul>', week, wl(week),
@@ -319,12 +359,12 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
     '<h3 id="weekly">All weeks</h3>', weekly,
     '<p class="note">Screeners and eligible are counted in the week of the screener; everything else in the week it happened (lab visits scheduled = the day it was booked). Screeners from blocked IPs/locations are not counted.</p>',
     '<h2 id="status">Screening outcomes</h2><div class="two">',
-    sprintf('<div><h3>This week</h3>%s</div><div><h3>All time</h3>%s</div></div>', .bars(out_w), .bars(out_a)),
+    sprintf('<div><h3>This week</h3>%s</div><div><h3>All time</h3>%s</div></div>', .bars(out_w), .bars(out_a)), bot,
     '<h3 id="inel">Ineligible reasons</h3><p class="note">A family can have more than one reason.</p><div class="two">',
     sprintf('<div><h4>This week</h4>%s</div><div><h4>All time</h4>%s</div></div>',
             .bars(rs_w[rs_w > 0], "No ineligible screeners this week."), .bars(rs_a[rs_a > 0], "None yet.")),
     '<h2 id="conv">Conversion</h2>',
-    '<p class="note">Each cell: % of the step before it, then the number of families in small grey. Interview, survey and lab visit % are out of caregiver consents. Families are linked through the screener ID in the tracking sheet.</p>',
+    '<p class="note">Each cell: a %, then the number of families in small grey. Eligible is out of screeners and consent out of eligible; interview, survey and lab visit scheduled are out of caregiver consents; lab visit done is out of lab visits scheduled. A family with a later step counts as consented (and a lab visit as scheduled) even if that date is missing in the tracker. Families are linked through the screener ID in the tracking sheet.</p>',
     '<h3 id="conv-week">By week</h3>', convw,
     '<h3 id="conv-src">By source (all time)</h3>', conv,
     '<h2 id="sources">Sources</h2><p class="note">Families can pick more than one source, so counts can add up to more than the number of screeners.</p>',

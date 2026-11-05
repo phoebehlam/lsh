@@ -253,3 +253,94 @@ test_that("lab manager's week: 37.5-hour bar, recruitment from the costs tab, un
   bad <- data.frame(date = c("10/26/2026", "10/27/2026"), `participant tracking` = c("2", "two"), check.names = FALSE)
   expect_error(read_lm_hours(bad), '"participant tracking", row 3: "two"')
 })
+
+test_that("screeners held as possible repeats (survey flow sets *_unsure_duplicate) are their own outcome", {
+  raw <- haven::read_sav(rec_ex("sim_prescreen.sav"))
+  i <- which(raw$eligi_status == "caregiv_eligible_under18")[1:3]
+  raw$eligi_status[i[1:2]] <- "caregiv_unsure_duplicate"
+  f <- tempfile(fileext = ".sav"); haven::write_sav(raw, f)
+  s <- read_screener(f)
+  keep <- as.numeric(raw$Status) %in% c(0, 4, 16)
+  expect_equal(sum(s$outcome == "Needs review: possible repeat screener"), sum(keep[i[1:2]]))
+  expect_false(any(s$eligible[s$outcome == "Needs review: possible repeat screener"]))
+  oc <- outcome_counts(s)
+  expect_true(all(c("Ineligible", "Needs review: possible repeat screener") %in% names(oc)))
+})
+
+test_that("dates print without leading zeros on any platform (no %-d)", {
+  expect_equal(.md(as.Date("2026-10-04")), "10/4")
+  expect_equal(.long_date(as.Date("2026-11-05")), "Nov 5, 2026")
+  d <- file.path(tempdir(), "rec_dates"); unlink(d, recursive = TRUE)
+  p <- suppressMessages(render_rth_recruitment(rec_ex("sim_prescreen.sav"), rec_ex("sim_tracking.xlsx"), out_dir = d, report_date = rd))
+  h <- paste(readLines(p, warn = FALSE), collapse = " ")
+  expect_false(grepl("-m/-d|Nov -d|%-", h))
+  expect_match(h, "Report run Oct 31, 2026")
+})
+
+test_that("conversion never passes 100%, even with missing consent dates and non-eligible screeners", {
+  s <- read_screener(rec_ex("sim_prescreen.sav"))
+  inel <- s$screener_id[s$outcome == "Ineligible"][1:2]
+  el <- s$screener_id[s$eligible][1:2]
+  df <- data.frame(`RTH ID` = c("9011", "9012", "9021", "9022", "9031"),
+                   `adolescent or caregiver?` = c("adolescent", "caregiver", "adolescent", "caregiver", "adolescent"),
+                   `screener ID` = c(inel[1], inel[1], el[1], el[1], el[1]),    # 903: second teen, same screener
+                   `consent signed date` = c("", "", "", "", "9/1/2026"),
+                   `phone interview date` = c("", "9/5/2026", "", "9/5/2026", ""),
+                   `lab visit scheduled date` = "", `lab visit date` = c("9/20/2026", "", "", "", ""), check.names = FALSE)
+  tr <- read_tracker(df); fam <- tracker_families(tr, rd)
+  s <- read_screener(rec_ex("sim_prescreen.sav"), approved = fam$screener_id)
+  expect_equal(s$outcome[s$screener_id == inel[1]], "Not marked eligible, but enrolled")
+  expect_true(s$eligible[s$screener_id == inel[1]])
+  st <- link_steps(s, fam)
+  i <- which(s$screener_id == inel[1])
+  expect_true(st$consent[i] && st$sched[i] && st$lab[i])                   # implied by later steps
+  for (r in list(source_conversion(s, st), weekly_conversion(s, st, as.Date("2026-04-25"), 1:27)))
+    for (v in c("pct_eligible", "pct_consent", "pct_interview", "pct_survey", "pct_sched", "pct_lab"))
+      expect_true(all(is.na(r[[v]]) | r[[v]] <= 100), info = v)
+  ck <- tracker_checks(s, tr, fam, st, rd)
+  lab <- vapply(ck, `[[`, "", "label")
+  expect_false(any(grepl("more than one family", lab)))                    # siblings share a screener ID
+  n <- stats::setNames(vapply(ck, `[[`, 0L, "n"), lab)
+  expect_equal(n[["Interview, survey or lab visit date but no consent date"]], 4L)   # families 901 and 902
+})
+
+test_that("Local recruitment groups flyers, mail, bus ads and candy stickers everywhere", {
+  s <- read_screener(rec_ex("sim_prescreen.sav"))
+  raw <- attr(s, "sources")
+  g <- .group_sources(s, .rth_source_groups)
+  src <- attr(g, "sources")
+  expect_true("Local recruitment" %in% colnames(src))
+  expect_false(any(c("Paper flyer", "Mail", "Bus ads", "Halloween candy sticker") %in% colnames(src)))
+  loc <- c("Paper flyer", "Mail", "Bus ads", "Halloween candy sticker")
+  expect_equal(sum(src[, "Local recruitment"]), sum(rowSums(raw[, intersect(loc, colnames(raw)), drop = FALSE]) > 0))
+  expect_equal(.map_source(c("paper flyer", "Bus Ads", "Facebook", "General"), .rth_source_groups),
+               c("Local recruitment", "Local recruitment", "Facebook", "General"))
+  d <- file.path(tempdir(), "rec_grp"); unlink(d, recursive = TRUE)
+  p <- suppressMessages(render_rth_recruitment(rec_ex("sim_prescreen.sav"), rec_ex("sim_tracking.xlsx"), out_dir = d,
+                                               report_date = rd, costs = TRUE, costs_sheet = rec_ex("sim_costs.xlsx")))
+  h <- paste(readLines(p, warn = FALSE), collapse = " ")
+  expect_match(h, "<td>Local recruitment</td>")
+  expect_false(grepl("<td>Paper flyer</td>|<span>Bus ads</span>|<span>Paper flyer</span>", h))
+  expect_match(h, "Lab visit scheduled")
+  # every choice reported separately when asked
+  p2 <- suppressMessages(render_rth_recruitment(rec_ex("sim_prescreen.sav"), rec_ex("sim_tracking.xlsx"), out_dir = d,
+                                                report_date = rd, source_groups = character()))
+  expect_match(paste(readLines(p2, warn = FALSE), collapse = " "), "<td>Paper flyer</td>")
+})
+
+test_that("write-ins never show emails or phone numbers; low reCAPTCHA scores counted across outcomes", {
+  raw <- haven::read_sav(rec_ex("sim_prescreen.sav"))
+  j <- which(raw$heard.where_car_5_TEXT != "")[1:2]
+  raw$heard.where_car_5_TEXT[j] <- c("i was refered to by jane doe jd1234@gmail.com", "call me 412-555-0199")
+  raw$Q_RecaptchaScore <- ifelse(seq_len(nrow(raw)) %% 10 == 0, 0.3, 0.9)
+  f <- tempfile(fileext = ".sav"); haven::write_sav(raw, f)
+  d <- file.path(tempdir(), "rec_scrub"); unlink(d, recursive = TRUE)
+  p <- suppressMessages(render_rth_recruitment(f, rec_ex("sim_tracking.xlsx"), out_dir = d, report_date = rd))
+  h <- paste(readLines(p, warn = FALSE), collapse = " ")
+  expect_false(grepl("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", h))
+  expect_false(grepl("555-0199|jane doe", h))
+  expect_match(h, "\\[email removed\\]")
+  s <- read_screener(f)
+  low <- !s$screened_out & s$recaptcha < 0.5
+  expect_match(h, sprintf("whatever the outcome:</b> [0-9]+ this week, %d all time", sum(low)))
+})

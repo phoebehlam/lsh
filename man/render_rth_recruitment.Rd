@@ -19,7 +19,8 @@ render_rth_recruitment(
   costs_tab = "costs",
   hourly_rates = c(`Lab manager` = 21.5 * 1.256, `Grad student` = 30000/520),
   lm_hours_tab = "lab manager hours",
-  lm_week_hours = 37.5
+  lm_week_hours = 37.5,
+  source_groups = .rth_source_groups
 )
 }
 \arguments{
@@ -64,6 +65,11 @@ in the report.}
 other hours, for the "Lab manager's week" bar.}
 
 \item{lm_week_hours}{Hours in the lab manager's full work week.}
+
+\item{source_groups}{Screener sources to report together, as
+c("screener choice" = "group"). Default: paper flyers, mail, bus ads and
+the candy stickers are grouped as "Local recruitment" (in the costs
+section too). Use \code{character()} to report every choice separately.}
 }
 \value{
 Path to the HTML report (invisibly).
