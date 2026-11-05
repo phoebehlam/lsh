@@ -37,7 +37,9 @@ weekly_counts <- function(scr, fam, study_start, last_week, seed = NULL) {
   cnt <- function(x) as.integer(table(factor(x, levels = w)))
   out <- tibble::tibble(
     week = w,
-    screeners = cnt(wk(s$date)),
+    screeners_all = cnt(wk(s$date)),
+    bots = cnt(wk(s$date[s$bot])),
+    screeners = cnt(wk(s$date[s$completed])),
     eligible = cnt(wk(s$date[s$eligible])),
     cg_consent = cnt(wk(fam$consent)),
     cg_interview = cnt(wk(fam$interview)),
@@ -78,13 +80,14 @@ link_steps <- function(scr, fam) {
                  survey = survey, sched = sched, lab = lab)
 }
 
-# One conversion row: counts and %. Eligible is out of screeners, consent out of
+# One conversion row: counts and %. Eligible is out of completed screeners
+# (finished, not a possible bot), consent out of
 # eligible; interview, survey and lab visit scheduled out of consents; lab visit
 # done out of lab visits scheduled.
 .conv_row <- function(sel, s, st) {
-  sc <- sum(sel); el <- sum(sel & s$eligible); cc <- sum(sel & st$consent)
+  sc <- sum(sel & s$completed); el <- sum(sel & s$eligible); cc <- sum(sel & st$consent)
   pc <- function(n, d) if (d) 100 * n / d else NA
-  list(screeners = sc, eligible = el, pct_eligible = pc(el, sc),
+  list(screeners_all = sum(sel), bots = sum(sel & s$bot), screeners = sc, eligible = el, pct_eligible = pc(el, sc),
        consent = cc, pct_consent = pc(cc, el),
        interview = sum(sel & st$interview), pct_interview = pc(sum(sel & st$interview), cc),
        survey = sum(sel & st$survey), pct_survey = pc(sum(sel & st$survey), cc),
@@ -102,7 +105,7 @@ source_conversion <- function(scr, steps) {
   none <- rowSums(src) == 0
   if (any(none)) rows <- c(rows, list(c(list(source = "No source given"), .conv_row(none, s, st))))
   out <- dplyr::bind_rows(rows)
-  if (nrow(out)) out <- out[out$screeners > 0, , drop = FALSE]          # choices nobody picked
+  if (nrow(out)) out <- out[out$screeners_all > 0, , drop = FALSE]      # choices nobody picked
   if (nrow(out)) out <- out[order(-out$screeners), , drop = FALSE]
   attr(out, "total") <- .conv_row(rep(TRUE, nrow(s)), s, st)
   out
@@ -247,10 +250,10 @@ source_counts <- function(scr, sel = rep(TRUE, nrow(scr))) {
 
 #' Screener demographics: % of eligible and % of not-eligible screeners per group
 #'
-#' Among finished screeners that weren't blocked.
+#' Among completed screeners (finished, not blocked, not a possible bot).
 #' @keywords internal
 screener_demographics <- function(scr) {
-  base <- scr$finished & !scr$screened_out
+  base <- scr$completed
   el <- base & scr$eligible; ne <- base & !scr$eligible
   tab <- function(x, lv) {
     x <- factor(x, levels = lv)

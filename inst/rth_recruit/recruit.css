@@ -23,7 +23,7 @@ th.asc:after{content:" \25B2";color:var(--ink)}th.desc:after{content:" \25BC";co
 tr.total td{font-weight:700;background:#F9FAFB;border-bottom:2px solid #9CA3AF}
 .scroll{overflow-x:auto;max-height:560px;overflow-y:auto}
 .cnt{color:#9CA3AF;font-size:.82em;margin-left:4px;font-weight:400}
-table.conv td{min-width:90px}
+table.conv td{min-width:66px;padding:4px 5px}table.conv th{padding:4px 5px;min-width:54px}#t-weekly th{min-width:54px}table.conv,#t-weekly{font-size:.8rem}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:28px}
 .three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px}
 @media(max-width:1000px){.two,.three{grid-template-columns:1fr}}

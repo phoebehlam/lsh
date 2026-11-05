@@ -73,14 +73,15 @@ render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, 
     cs$lmh <- read_lm_hours(costs_sheet, lm_hours_tab); cs$week_hours <- lm_week_hours
   }
   html <- recruitment_html(scr = scr, tr = tr, fam = fam, ses = ses, steps = steps, wk_tab = wk_tab,
-                           week = week, study_start = study_start, report_date = report_date, cs = cs)
+                           week = week, study_start = study_start, report_date = report_date, cs = cs,
+                           groups = source_groups)
   dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
   path <- file.path(normalizePath(out_dir), sprintf("RTH_recruitment_week%02d_%s.html", week,
                                                     format(.week_start(week, study_start) + 6)))
   writeLines(html, path, useBytes = TRUE)
   this <- wk_tab[wk_tab$week == week, ]
   message("Recruitment report written: ", path,
-          sprintf("\n  Week %d: %d screeners, %d eligible, %d caregiver consents, %d lab visits done.", week,
+          sprintf("\n  Week %d: %d completed screeners, %d eligible, %d caregiver consents, %d lab visits done.", week,
                   this$screeners, this$eligible, this$cg_consent, this$lab_done))
   invisible(path)
 }
@@ -112,10 +113,10 @@ render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, 
           if (is.null(foot)) "" else sprintf('<tr class="total">%s</tr>', foot), paste(body, collapse = ""))
 }
 .conv_cells <- function(r) paste0(
-  .td(r$screeners), .pct_td(r$pct_eligible, r$eligible), .pct_td(r$pct_consent, r$consent),
+  .td(r$screeners_all), .td(r$bots), .td(r$screeners), .pct_td(r$pct_eligible, r$eligible), .pct_td(r$pct_consent, r$consent),
   .pct_td(r$pct_interview, r$interview), .pct_td(r$pct_survey, r$survey), .pct_td(r$pct_sched, r$sched),
   .pct_td(r$pct_lab, r$lab))
-.conv_head <- c("Screeners", "Eligible", "Caregiver consent", "Caregiver interview", "Caregiver survey",
+.conv_head <- c("All screeners", "Possible bots", "Completed screeners", "Eligible", "Caregiver consent", "Caregiver interview", "Caregiver survey",
                 "Lab visit scheduled", "Lab visit done")
 
 # Okabe-Ito colors: easy to tell apart, colorblind-safe
@@ -206,16 +207,28 @@ plot_completion <- function(ct) {
 # Low reCAPTCHA scores across all outcomes. The screener only gives the
 # "possible bot" status to otherwise-eligible caregivers, so most low scores
 # end up under Ineligible, Didn't finish, etc.
-.recaptcha_note <- function(scr, in_week, cut = 0.5) {
-  rc <- scr$recaptcha; ok <- !scr$screened_out
-  if (all(is.na(rc[ok]))) return('<p class="note">reCAPTCHA scores: not in this export.</p>')
-  low <- ok & !is.na(rc) & rc < cut
-  by <- sort(table(scr$outcome[low]), decreasing = TRUE)
-  sprintf(paste0('<p class="note"><b>Low reCAPTCHA score (below %.1f), whatever the outcome:</b> %d this week, %d all time ',
-                 '(of %d screeners with a score)%s. Only otherwise-eligible caregivers get the &ldquo;Possible bot&rdquo; status, ',
-                 'so most low scores show up under the other outcomes.</p>'),
-          cut, sum(low & in_week), sum(low), sum(ok & !is.na(rc)),
-          if (length(by)) paste0("; all time by outcome: ", paste(sprintf("%s %d", .esc(names(by)), as.integer(by)), collapse = ", ")) else "")
+.recaptcha_note <- function(scr, in_week, cut = .bot_cut) {
+  ok <- !scr$screened_out; rc <- scr$recaptcha
+  has <- ok & !is.na(rc)
+  if (!any(has)) return(paste0('<p class="note"><b>Possible bots:</b> reCAPTCHA scores aren&rsquo;t in this export, so only ',
+                               'screeners the survey flagged are counted (it flags only otherwise-eligible caregivers). ',
+                               'Possible bots are left out of completed screeners and every %.</p>'))
+  b <- ok & scr$bot
+  sprintf(paste0('<p class="note"><b>Possible bots</b> = reCAPTCHA score below %.1f, whatever the answers and whether or not ',
+                 'the screener was finished: %d this week, %d all time (%d of them finished the screener). ',
+                 'Possible bots are left out of completed screeners and every %%. ',
+                 'Families who later enrolled count as real.%s</p>'),
+          cut, sum(b & in_week), sum(b), sum(b & scr$finished),
+          if (any(ok & is.na(rc))) sprintf(" %d screeners have no score (from before scores were saved)%s.", sum(ok & is.na(rc)),
+            if (any(b & is.na(rc))) sprintf("; %d of those were flagged by the survey and are counted too", sum(b & is.na(rc))) else "") else "")
+}
+
+# "Local recruitment = Paper flyer, Mail, ..." for each group in the report
+.groups_note <- function(groups, shown) {
+  g <- intersect(unique(unname(groups)), shown)
+  txt <- vapply(g, function(k) sprintf("<b>%s</b> = %s", .esc(k), .esc(paste(names(groups)[groups == k], collapse = ", "))), "")
+  paste0('<p class="note">', if (length(txt)) paste0(paste(txt, collapse = "; "), " (a family who picked more than one of these counts once). ") else "",
+         'Counts are of all screeners, including unfinished ones and possible bots.</p>')
 }
 
 .count_bars <- function(x, total) {
@@ -225,7 +238,8 @@ plot_completion <- function(ct) {
                 .esc(names(x)), 100 * x / max(x), as.integer(x), 100 * x / total), collapse = "")
 }
 
-recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start, report_date, cs = NULL) {
+recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start, report_date, cs = NULL,
+                             groups = character()) {
   css <- paste(readLines(file.path(.rth_recruit_home(), "recruit.css"), warn = FALSE), collapse = "\n")
   wl <- function(k) .week_label(k, study_start)
   sw <- rth_study_week(scr$date, study_start)
@@ -244,8 +258,10 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
   wend <- .week_start(week, study_start) + 6
   upcoming <- sum(!is.na(fam$lab_date) & fam$lab_date > report_date)
   facts <- c(
-    sprintf("Screeners: %d%s", this$screeners,
-            if (length(prev)) sprintf(" (average of previous %d weeks: %.0f)", length(prev), mean(prev)) else ""),
+    sprintf("Completed screeners: %d%s; all screeners, including unfinished ones and possible bots: %d; possible bots: %d",
+            this$screeners,
+            if (length(prev)) sprintf(" (average of previous %d weeks: %.0f)", length(prev), mean(prev)) else "",
+            this$screeners_all, this$bots),
     sprintf("Eligible: %d; needs review (diagnosis reported): %d; needs review (possible repeat screener): %d", this$eligible,
             sum(in_week & scr$outcome == "Needs review: diagnosis reported"),
             sum(in_week & scr$outcome == "Needs review: possible repeat screener")),
@@ -253,7 +269,7 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
     sprintf("Caregiver interviews: %d; caregiver surveys: %d", this$cg_interview, this$cg_survey),
     sprintf("Lab visits scheduled (booked this week): %s; lab visits done: %d; upcoming lab visits: %d",
             if (is.na(this$lab_sched)) "not tracked yet" else this$lab_sched, this$lab_done, upcoming),
-    if (length(top_w)) sprintf("Top source: %s (%d of %d screeners)", names(top_w)[1], top_w[[1]], this$screeners)
+    if (length(top_w)) sprintf("Top source: %s (%d of %d screeners)", names(top_w)[1], top_w[[1]], this$screeners_all)
     else "Top source: none reported")
 
   # All weeks (newest first; totals at the top) ----
@@ -261,12 +277,12 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
   na0 <- function(v) ifelse(is.na(v), "&ndash;", v)
   body <- vapply(seq_len(nrow(wt)), function(i) {
     r <- wt[i, ]
-    paste0("<tr>", .wk_cell(r$week, wl), .td(r$screeners), .td(r$eligible), .td(r$cg_consent),
+    paste0("<tr>", .wk_cell(r$week, wl), .td(r$screeners_all), .td(r$bots), .td(r$screeners), .td(r$eligible), .td(r$cg_consent),
            .td(r$cg_interview), .td(r$cg_survey), .td(r$lab_sched, na0(r$lab_sched)), .td(r$lab_done), "</tr>")
   }, "")
-  tot <- c(sum(wt$screeners), sum(wt$eligible), sum(wt$cg_consent), sum(wt$cg_interview), sum(wt$cg_survey),
+  tot <- c(sum(wt$screeners_all), sum(wt$bots), sum(wt$screeners), sum(wt$eligible), sum(wt$cg_consent), sum(wt$cg_interview), sum(wt$cg_survey),
            sum(wt$lab_sched, na.rm = TRUE), sum(wt$lab_done))
-  weekly <- .table("t-weekly", c("Week", "Screeners", "Eligible", "Caregiver consent", "Caregiver interview",
+  weekly <- .table("t-weekly", c("Week", "All screeners", "Possible bots", "Completed screeners", "Eligible", "Caregiver consent", "Caregiver interview",
                                  "Caregiver survey", "Lab visits scheduled", "Lab visits done"), body,
                    paste0("<td>Total</td>", paste0("<td>", tot, "</td>", collapse = "")))
 
@@ -364,10 +380,10 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
     sprintf('<div><h4>This week</h4>%s</div><div><h4>All time</h4>%s</div></div>',
             .bars(rs_w[rs_w > 0], "No ineligible screeners this week."), .bars(rs_a[rs_a > 0], "None yet.")),
     '<h2 id="conv">Conversion</h2>',
-    '<p class="note">Each cell: a %, then the number of families in small grey. Eligible is out of screeners and consent out of eligible; interview, survey and lab visit scheduled are out of caregiver consents; lab visit done is out of lab visits scheduled. A family with a later step counts as consented (and a lab visit as scheduled) even if that date is missing in the tracker. Families are linked through the screener ID in the tracking sheet.</p>',
+    '<p class="note">Each cell: a %, then the number of families in small grey. All screeners includes unfinished ones and possible bots; completed screeners = finished and not a possible bot, and every % starts from them. Eligible is out of completed screeners and consent out of eligible; interview, survey and lab visit scheduled are out of caregiver consents; lab visit done is out of lab visits scheduled. A family with a later step counts as consented (and a lab visit as scheduled) even if that date is missing in the tracker. Families are linked through the screener ID in the tracking sheet.</p>',
     '<h3 id="conv-week">By week</h3>', convw,
     '<h3 id="conv-src">By source (all time)</h3>', conv,
-    '<h2 id="sources">Sources</h2><p class="note">Families can pick more than one source, so counts can add up to more than the number of screeners.</p>',
+    '<h2 id="sources">Sources</h2>', .groups_note(groups, colnames(attr(scr, "sources"))),
     sprintf('<div class="two"><div><h3>This week</h3>%s</div><div><h3>All time</h3>%s</div></div>',
             .bars(src_w, "No screeners this week."), .bars(src_a, "No screeners yet.")),
     '<h3 id="src-chart">Screeners by week and source (last 12 weeks)</h3>', chart,

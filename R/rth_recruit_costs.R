@@ -74,7 +74,7 @@ cost_summary <- function(cst, scr, steps, week, study_start) {
   s <- scr[keep, , drop = FALSE]; st <- steps[keep, , drop = FALSE]
   share <- if (ncol(src)) src / pmax(rowSums(src), 1) else src
   credit <- function(sel) colSums(share * sel)
-  cr <- cbind(screeners = credit(TRUE), eligible = credit(s$eligible), consent = credit(st$consent), lab = credit(st$lab))
+  cr <- cbind(screeners = credit(s$completed), eligible = credit(s$eligible), consent = credit(st$consent), lab = credit(st$lab))
 
   cst$week <- rth_study_week(cst$date, study_start)
   cst <- cst[is.na(cst$week) | cst$week <= week, , drop = FALSE]        # nothing after the report week
@@ -94,7 +94,7 @@ cost_summary <- function(cst, scr, steps, week, study_start) {
   if (nrow(by_src)) by_src <- by_src[order(-by_src$cost), , drop = FALSE]
   tot <- data.frame(source = "All strategies", money = sum(cst$cost[cst$type == "Expense"], na.rm = TRUE),
                     hours = sum(cst$hours, na.rm = TRUE), labor = sum(cst$cost[cst$type == "Time"], na.rm = TRUE),
-                    cost = sum(cst$cost, na.rm = TRUE), screeners = nrow(s), eligible = sum(s$eligible),
+                    cost = sum(cst$cost, na.rm = TRUE), screeners = sum(s$completed), eligible = sum(s$eligible),
                     consent = sum(st$consent), lab = sum(st$lab))
 
   # by week (dated rows), newest first; undated rows = before weekly tracking
@@ -105,7 +105,7 @@ cost_summary <- function(cst, scr, steps, week, study_start) {
                                     screeners = n)
   by_week <- do.call(rbind, c(list(data.frame(week = integer(), money = numeric(), hours = numeric(), labor = numeric(),
                                               cost = numeric(), screeners = integer())),
-    lapply(wks, function(k) cbind(week = k, wrow(cst[cst$week %in% k, ], sum(!is.na(sw) & sw == k))))))
+    lapply(wks, function(k) cbind(week = k, wrow(cst[cst$week %in% k, ], sum(!is.na(sw) & sw == k & s$completed))))))
   before <- cst[is.na(cst$week), , drop = FALSE]
 
   this <- cst[cst$week %in% week & cst$type == "Time", , drop = FALSE]
@@ -136,7 +136,7 @@ cost_summary <- function(cst, scr, steps, week, study_start) {
 .hrs <- function(h) ifelse(is.na(h), "&ndash;", sub("\\.$", "", sub("0+$", "", formatC(round(h, 2), format = "f", digits = 2))))
 .cred <- function(x) ifelse(abs(x - round(x)) < 1e-9, sprintf("%d", as.integer(round(x))), sprintf("%.1f", x))
 
-.util_cols <- c(screeners = "screener", eligible = "eligible family", consent = "caregiver consent", lab = "lab visit")
+.util_cols <- c(screeners = "completed screener", eligible = "eligible family", consent = "caregiver consent", lab = "lab visit")
 .thin_n <- 3
 
 # Cost per step for one row; class "best" / "thin" set by the caller
@@ -205,7 +205,7 @@ cost_html <- function(cs, week, wl, lmh = NULL, study_start, week_hours = 37.5) 
     .td(round(sum(b$cost[b$type == "Time"], na.rm = TRUE), 2), .money(sum(b$cost[b$type == "Time"], na.rm = TRUE))),
     .td(round(sum(b$cost, na.rm = TRUE), 2), .money(sum(b$cost, na.rm = TRUE))), "<td>&ndash;</td><td>&ndash;</td></tr>"))
   weeks_tab <- .table("t-costweek", c("Week", "Ads, materials &amp; treats", "Staff hours", "Staff time", "Total",
-                                      "Screeners that week", "$ per screener that week"), wbody,
+                                      "Completed screeners that week", "$ per completed screener that week"), wbody,
                       paste0("<td>Total</td><td>", .money(tt$money), "</td><td>", .hrs(tt$hours), "</td><td>", .money(tt$labor),
                              "</td><td>", .money(tt$cost), "</td><td>&ndash;</td><td>&ndash;</td>"))
 
@@ -227,12 +227,12 @@ cost_html <- function(cs, week, wl, lmh = NULL, study_start, week_hours = 37.5) 
          '<h3 id="cost-util">Cost per step, by source (all time)</h3>',
          '<p class="note">Total cost = ads, materials and treats + staff time spent on recruitment (hover for the split). ',
          'Each cell: cost per family reaching that step, then the number of families in small grey. A family that picked 2 sources counts as half for each, ',
-         'so counts can have decimals. General costs are only in All strategies, which is divided by every screener. ',
+         'so counts can have decimals. General costs are only in All strategies, which is divided by every completed screener. ',
          sprintf('<span class="best-key">Green</span> = cheapest; <span class="thin-key">grey</span> = fewer than %d families, too few to compare. ', .thin_n),
          'Later steps lag: recent screeners haven&rsquo;t had time to reach a lab visit yet.</p>',
          util, free,
          '<h3 id="cost-weeks">By week</h3>', weeks_tab,
-         '<p class="note">Costs are counted in the week of the date in the sheet. &ldquo;$ per screener that week&rdquo; is only a rough guide, since ads and flyers keep bringing in screeners after the week they were paid for.</p>',
+         '<p class="note">Costs are counted in the week of the date in the sheet. &ldquo;$ per completed screener that week&rdquo; is only a rough guide, since ads and flyers keep bringing in screeners after the week they were paid for.</p>',
          sprintf('<h3 id="cost-hours">Lab manager&rsquo;s recruitment hours this week (Week %d: %s)</h3>', week, wl(week)),
          lm_rec_html(cs, week),
          sprintf('<h3 id="lm-week">Lab manager&rsquo;s week (Week %d: %s)</h3>', week, wl(week)),

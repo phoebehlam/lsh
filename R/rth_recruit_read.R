@@ -65,6 +65,8 @@ rth_study_week <- function(date, study_start) {
 #' @param approved Screener IDs of families in the tracking sheet; they count as
 #'   eligible even if the screener said otherwise (e.g. approved after review).
 #' @keywords internal
+.bot_cut <- 0.5
+
 read_screener <- function(path, approved = character()) {
   raw <- haven::read_sav(path)
   raw <- .drop_previews(raw)
@@ -89,11 +91,12 @@ read_screener <- function(path, approved = character()) {
     !finished ~ "Didn't finish screener",
     TRUE ~ "No status recorded")
 
-  # The survey flow sets "eligible (18)" after the reCAPTCHA check, so an
-  # 18-year-old with a low score loses the bot flag; restore it when the score
-  # is in the export.
+  # Possible bot = reCAPTCHA score below 0.5, whatever the answers and whether
+  # or not the screener was finished (the survey flow only flags otherwise-
+  # eligible caregivers). Without the score in the export, only the survey
+  # flow's flag is available. Families later enrolled count as real (below).
   rc <- suppressWarnings(as.numeric(col("Q_RecaptchaScore")))
-  outcome[!is.na(rc) & rc < 0.5 & outcome == "Eligible (child 18)"] <- "Possible bot (low reCAPTCHA score)"
+  outcome[!is.na(rc) & rc < .bot_cut & !screened_out] <- "Possible bot (low reCAPTCHA score)"
 
   sid <- .clean_id(col("screenerid"))
   rid <- as.character(col("ResponseId"))
@@ -150,6 +153,9 @@ read_screener <- function(path, approved = character()) {
     screened_out = screened_out,
     outcome = outcome,
     eligible = grepl("^Eligible", outcome) | outcome == "Not marked eligible, but enrolled",
+    bot = outcome == "Possible bot (low reCAPTCHA score)",
+    # finished, and not a possible bot: the base for every %
+    completed = !screened_out & !outcome %in% c("Didn't finish screener", "Possible bot (low reCAPTCHA score)"),
     age = age,
     income = .lab(col("income")),
     race_group = score_race(race),

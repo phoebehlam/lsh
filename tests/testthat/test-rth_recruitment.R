@@ -188,10 +188,10 @@ test_that("cost per step: fractional credit, General only in the total, cheapest
   expect_equal(sum(colSums(share)), sum(rowSums(src) > 0))
   ig <- cs$by_src[cs$by_src$source == "Instagram", ]
   expect_equal(ig$cost, 1400 + 350 + 350 + 1.5 * 27.004)
-  expect_equal(ig$screeners, sum(share[, "Instagram"]))
+  expect_equal(ig$screeners, sum(share[, "Instagram"] * s$completed[!s$screened_out]))
   gen <- sum(cst$cost[cst$source == "General"])
   expect_equal(cs$total$cost, sum(cs$by_src$cost) + gen)
-  expect_equal(cs$total$screeners, sum(!s$screened_out))
+  expect_equal(cs$total$screeners, sum(s$completed))
   h <- cost_html(cs, 27, function(k) .week_label(k, as.Date("2026-04-25")))
   # a cell is never both cheapest and too thin
   expect_false(grepl('class="best">[^<]*<span class="cnt">[0-2](\\.[0-9])?</span>', h))
@@ -332,7 +332,7 @@ test_that("write-ins never show emails or phone numbers; low reCAPTCHA scores co
   raw <- haven::read_sav(rec_ex("sim_prescreen.sav"))
   j <- which(raw$heard.where_car_5_TEXT != "")[1:2]
   raw$heard.where_car_5_TEXT[j] <- c("i was refered to by jane doe jd1234@gmail.com", "call me 412-555-0199")
-  raw$Q_RecaptchaScore <- ifelse(seq_len(nrow(raw)) %% 10 == 0, 0.3, 0.9)
+  raw$Q_RecaptchaScore <- ifelse(seq_len(nrow(raw)) %% 10 == 0 | grepl("recaptcha", raw$eligi_status), 0.3, 0.9)
   f <- tempfile(fileext = ".sav"); haven::write_sav(raw, f)
   d <- file.path(tempdir(), "rec_scrub"); unlink(d, recursive = TRUE)
   p <- suppressMessages(render_rth_recruitment(f, rec_ex("sim_tracking.xlsx"), out_dir = d, report_date = rd))
@@ -340,7 +340,30 @@ test_that("write-ins never show emails or phone numbers; low reCAPTCHA scores co
   expect_false(grepl("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", h))
   expect_false(grepl("555-0199|jane doe", h))
   expect_match(h, "\\[email removed\\]")
-  s <- read_screener(f)
+  fam <- tracker_families(read_tracker(rec_ex("sim_tracking.xlsx")), rd)
+  s <- read_screener(f, approved = fam$screener_id)
   low <- !s$screened_out & s$recaptcha < 0.5
-  expect_match(h, sprintf("whatever the outcome:</b> [0-9]+ this week, %d all time", sum(low)))
+  enrolled <- low & s$outcome == "Not marked eligible, but enrolled"
+  expect_equal(sum(s$bot), sum(low) - sum(enrolled))                     # bots by score alone, unless enrolled
+  expect_match(h, sprintf("whether or not the screener was finished: [0-9]+ this week, %d all time", sum(s$bot)))
+  expect_false(any(s$completed & s$bot)); expect_false(any(s$completed & s$outcome == "Didn't finish screener"))
+})
+
+test_that("all screeners vs completed screeners; every % starts from completed", {
+  s <- read_screener(rec_ex("sim_prescreen.sav"))
+  tr <- read_tracker(rec_ex("sim_tracking.xlsx")); fam <- tracker_families(tr, rd); st <- link_steps(s, fam)
+  sc <- source_conversion(s, st); t <- attr(sc, "total")
+  ok <- !s$screened_out
+  expect_equal(t$screeners_all, sum(ok))
+  expect_equal(t$screeners, sum(s$completed))
+  expect_equal(t$screeners_all, t$screeners + t$bots + sum(ok & s$outcome == "Didn't finish screener" & !s$bot))
+  expect_equal(t$pct_eligible, 100 * t$eligible / t$screeners)
+  wk <- weekly_counts(s, fam, as.Date("2026-04-25"), 27)
+  expect_equal(sum(wk$screeners), sum(s$completed & rth_study_week(s$date, as.Date("2026-04-25")) <= 27, na.rm = TRUE))
+  d <- file.path(tempdir(), "rec_cmp"); unlink(d, recursive = TRUE)
+  p <- suppressMessages(render_rth_recruitment(rec_ex("sim_prescreen.sav"), rec_ex("sim_tracking.xlsx"), out_dir = d, report_date = rd))
+  h <- paste(readLines(p, warn = FALSE), collapse = " ")
+  for (tb in c("t-weekly", "t-conv", "t-convw"))
+    expect_match(h, sprintf('id="%s"><thead><tr>.*?All screeners.*?Possible bots.*?Completed screeners', tb))
+  expect_match(h, "<b>Local recruitment</b> = Paper flyer, Mail, Bus ads, Halloween candy sticker, Candy / Gatorade Sticker")
 })
