@@ -389,7 +389,7 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
     '<h3 id="src-chart">Completed screeners by week and source (last 12 weeks)</h3>', chart,
     '<h3 id="src-week">Completed screeners by source, each week</h3>', src_tab, writein,
     '<h2 id="demo">Demographics</h2>',
-    sprintf('<h3 id="demo-scr">Screener (all time)</h3><p class="note">Finished screeners: %d eligible, %d not eligible. Bars show the %% of each group.</p>',
+    sprintf('<h3 id="demo-scr">Screener (all time)</h3><p class="note">Completed screeners only (finished, not a possible bot): %d eligible, %d not eligible. Bars show the %% of each group.</p>',
             dm$n_eligible, dm$n_not_eligible),
     '<div class="dl"><span><i class="el"></i>Eligible</span><span><i class="ne"></i>Not eligible</span></div><div class="three">',
     .demo_html("Child&rsquo;s age", dm$age), .demo_html("Race/ethnicity", dm$race), .demo_html("Household income", dm$income),

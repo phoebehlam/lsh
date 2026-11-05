@@ -374,3 +374,13 @@ test_that("all screeners vs completed screeners; every % starts from completed",
   expect_match(h, "completed screeners only")
   expect_match(h, "<b>Local recruitment</b> = Paper flyer, Mail, Bus ads, Halloween candy sticker, Candy / Gatorade Sticker")
 })
+
+test_that("screener demographics use completed screeners only", {
+  raw <- haven::read_sav(rec_ex("sim_prescreen.sav"))
+  raw$Q_RecaptchaScore <- ifelse(seq_len(nrow(raw)) %% 7 == 0, 0.2, 0.9)
+  f <- tempfile(fileext = ".sav"); haven::write_sav(raw, f)
+  s <- read_screener(f)
+  dm <- screener_demographics(s)
+  expect_equal(dm$n_eligible + dm$n_not_eligible, sum(s$completed))
+  expect_true(sum(s$bot) > 0 && sum(s$outcome == "Didn't finish screener") > 0)
+})
