@@ -65,9 +65,13 @@ Compliance 1 = before 14:00, 2 = 14:00-23:59, 3 = the next day or later.
 }
 Tagging rules, per participant and night/day:
 \itemize{
-\item R0: unfinished entry and a finished one exists for the same date: drop the unfinished one.
-\item R1: 2+ entries and the night/day before is empty: the earliest moves back one.
-\item R2: 2+ entries and the night/day before is filled: keep the earliest finished one, drop the rest.
+\item R0: an entry with no answers, or an unfinished entry restarted within 30 minutes: drop it.
+(Other unfinished entries count like any entry: partial data are kept.)
+\item R1: 2+ entries and 1-3 empty nights/days right before: the earliest entries fill them, one each,
+nearest first. On a participant's first date, one night-diary entry started 12:00-19:00 can move to
+the night before.
+\item R2: 2+ entries left: keep one, drop the rest. Night entries all started after 16:00 on the date:
+the one closest to the participant's usual start time; otherwise the earliest (finished ones first).
 \item R3 (night diaries): one entry started 12:00-19:00 and the night before is empty (not the
 participant's first entry): it moves back one night.
 \item R99: anything else that looks off (e.g. an entry that took 0 seconds): needs a decision.

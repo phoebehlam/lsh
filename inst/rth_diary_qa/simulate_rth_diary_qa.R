@@ -14,11 +14,16 @@
 #   caregiver 9062: restarts left unfinished (R0)
 #   caregiver 9072: two entries on the last night, one took 0 seconds (R99)
 #   caregiver 9082: nothing to fix
+#   caregiver 9092: 3 finished entries on one night after 2 empty nights (R1 fills both);
+#                   a diary opened but not answered (R0)
 #   + one preview response and one response without an ID
 #   adolescent night 9011: two entries, night before empty (R1); a restart (R0)
 #   adolescent night 9031: nothing to fix
+#   adolescent night 9051: an unfinished afternoon entry with answers + an evening one, 2 empty nights
+#                          before (R1 moves the unfinished one back: partial answers are kept)
 #   adolescent morning 9011: identical resubmission (R2)
 #   adolescent morning 9031: two entries, day before empty (R1); a 01:31 entry (counts for the day before)
+#   adolescent morning 9061: 2 entries after a week-long gap (no move back; R2 keeps the earlier)
 #   adolescent morning 9042: a caregiver ID in the teen diary (listed under rows to fix)
 
 suppressPackageStartupMessages({ library(haven) })
@@ -39,10 +44,12 @@ answers <- function(kind) {
 }
 
 # One response. start = "2026-08-07 21:05:12"
-resp <- function(id, start, kind, dur = 420, finished = 1, progress = 100, status = 0, same_as = NULL) {
+resp <- function(id, start, kind, dur = 420, finished = 1, progress = 100, status = 0, same_as = NULL,
+                 empty = FALSE) {
   st <- as.POSIXct(start, tz = "UTC")
   a <- if (is.null(same_as)) answers(kind) else same_as
   if (!finished) a[sample(names(a), ceiling(length(a) / 2))] <- NA
+  if (empty) a[] <- NA
   c(list(StartDate = st, EndDate = st + dur, Status = status, Progress = progress, Finished = finished,
          Duration__in_seconds_ = dur, RecordedDate = st + dur,
          ResponseId = paste0("R_", paste(sample(c(letters, LETTERS, 0:9), 15, TRUE), collapse = "")),
@@ -89,6 +96,10 @@ cg <- c(cg, list(resp("9042, 9052", "2026-07-13 17:36:46", "night", same_as = a)
   regular("9072", "2026-10-10", 14, "night", "21:00"),
   list(resp("9072", "2026-10-24 12:05:53", "night"), resp("9072", "2026-10-24 20:00:00", "night", dur = 0)),
   regular("9082", "2026-10-17", 15, "night", "20:45"),
+  regular("9092", "2026-09-27", 15, "night", "22:30", skip = c(6, 7, 8, 12)),
+  list(resp("9092", "2026-10-04 22:28:51", "night"), resp("9092", "2026-10-04 22:34:23", "night"),
+       resp("9092", "2026-10-04 22:37:52", "night"),
+       resp("9092", "2026-10-08 22:05:00", "night", finished = 0, progress = 3, empty = TRUE)),
   list(resp("9082", "2026-10-20 10:00:00", "night", status = 1),   # survey preview
        resp(NA, "2026-10-21 21:10:00", "night")))                    # no ID
 
@@ -98,7 +109,10 @@ an <- c(
   list(resp("9011", "2026-08-07 21:05:12", "night"), resp("9011", "2026-08-07 23:40:51", "night"),
        resp("9011", "2026-08-12 22:10:33", "night", finished = 0, progress = 40),
        resp("9011", "2026-08-12 22:14:02", "night")),
-  regular("9031", "2026-10-05", 15, "night", "22:30"))
+  regular("9031", "2026-10-05", 15, "night", "22:30"),
+  regular("9051", "2026-08-21", 13, "night", "23:00", skip = c(8, 9, 10)),
+  list(resp("9051", "2026-08-30 12:32:30", "night", finished = 0, progress = 45),
+       resp("9051", "2026-08-30 22:30:33", "night")))
 
 # Adolescent morning diary ------------------------------------------------------------
 b <- answers("morning")
@@ -109,7 +123,9 @@ am <- c(
   regular("9031", "2026-10-06", 15, "morning", "07:40", skip = c(4, 5, 12)),
   list(resp("9031", "2026-10-10 06:58:14", "morning"), resp("9031", "2026-10-10 07:01:38", "morning"),
        resp("9031", "2026-10-18 01:31:20", "morning")),
-  regular("9042", "2026-10-06", 3, "morning", "07:30"))
+  regular("9042", "2026-10-06", 3, "morning", "07:30"),
+  regular("9061", "2026-08-13", 22, "morning", "07:00", skip = 7:13),
+  list(resp("9061", "2026-08-26 14:49:45", "morning")))
 
 # Write, shaped like the Qualtrics exports -----------------------------------------------
 conform <- function(shell, rows) {

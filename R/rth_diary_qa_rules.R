@@ -70,6 +70,25 @@
 }
 .qa_split <- function(person) trimws(strsplit(person, ",")[[1]])
 
+# Number of survey questions answered (Qualtrics metadata, page timers and
+# embedded data don't count), to tell a partial entry with usable answers from
+# one that was only opened.
+.qa_meta <- c("startdate", "enddate", "status", "ipaddress", "progress", "duration__in_seconds_", "finished",
+              "recordeddate", "responseid", "recipientlastname", "recipientfirstname", "recipientemail",
+              "externalreference", "locationlatitude", "locationlongitude", "distributionchannel", "userlanguage",
+              "complete", "id")
+.qa_n_answers <- function(raw) {
+  keep <- !(names(raw) %in% .qa_meta) &
+    !grepl("_(first_click|last_click|page_submit|click_count)$|^q_|^nback|_trialdata$", names(raw))
+  if (!any(keep)) return(rep(0L, nrow(raw)))
+  m <- vapply(raw[keep], function(v) {
+    v <- haven::zap_labels(v)
+    !is.na(v) & trimws(as.character(v)) != ""
+  }, logical(nrow(raw)))
+  if (is.null(dim(m))) m <- matrix(m, nrow = nrow(raw))
+  as.integer(rowSums(m))
+}
+
 # Read one export ---------------------------------------------------------------
 
 .qa_read <- function(path, type, s) {
@@ -104,6 +123,7 @@
   x$finished <- as.numeric(raw$finished) %in% 1
   x$diary_date <- .qa_diary_date(start, kind, s)
   x$use <- !is.na(x$person) & !is.na(start) & !is.na(rid)
+  x$n_answers <- .qa_n_answers(raw)
 
   noid <- x[!x$use, c("responseid", "person"), drop = FALSE]
   noid$started <- ifelse(is.na(start[!x$use]), "no start time", .qa_ts(start[!x$use]))
@@ -189,6 +209,12 @@
   add_ev <- function(dd, r, txt, needs = FALSE)
     ev[[length(ev) + 1]] <<- list(person = y$person[1], date = dd, rule = r, text = txt, needs = needs)
   ts <- function(i) .qa_ts(y$start[i]); hms <- function(i) .qa_hms(y$start[i])
+  offset <- function(i, dt) as.numeric(difftime(y$start[i], as.POSIXct(dt, tz = "UTC"), units = "hours"))
+  clock <- function(h) sprintf("%02d:%02d", floor(h %% 24), round((h %% 1) * 60) %% 60)
+  # Usual start time: median hours after midnight of the date, over entries
+  # that are alone on their date (night diaries done the next morning are > 24).
+  alone <- !duplicated(y$diary_date) & !duplicated(y$diary_date, fromLast = TRUE) & y$n_answers > 0
+  typical <- if (sum(alone) >= s$typical_min_n) stats::median(offset(which(alone), y$diary_date[alone])) else NA
   rng <- range(c(y$diary_date, cur), na.rm = TRUE)
 
   for (dd in as.list(seq(rng[1], rng[2], by = "day"))) {
@@ -197,6 +223,15 @@
     idx <- idx[order(y$start[idx])]
     und <- idx[!dec[idx]]
     if (!length(und)) next
+
+    # R0: opened but nothing answered -> drop
+    empty <- und[y$n_answers[und] == 0]
+    if (length(empty)) {
+      rule[empty] <- "R0"; act[empty] <- "drop"; cur[empty] <- NA
+      add_ev(dd, "R0", sprintf("%s: %s opened but nothing answered, dropped.", .qa_md(dd), paste(hms(empty), collapse = " and ")))
+      idx <- setdiff(idx, empty); und <- setdiff(und, empty)
+      if (!length(und)) next
+    }
 
     # One entry: R3 (night diaries) -------------------------------------------
     if (length(idx) == 1) {
@@ -220,63 +255,93 @@
       why <- sprintf("%s took 0 seconds (start and end times are the same), so it may have been entered or edited by hand.",
                      paste(hms(off), collapse = " and "))
 
-    # R0: unfinished entries when a finished one exists
+    # R0: restarts (unfinished, and another entry started within restart_minutes)
     if (is.null(why)) {
-      unf <- g[!y$finished[g]]
-      if (length(unf) && any(y$finished[g])) {
-        if (any(dec[unf])) {
-          why <- "an unfinished entry kept in an earlier week would be dropped."
+      rs <- g[vapply(g, function(i) !y$finished[i] && any(g != i & y$start[g] > y$start[i] &
+                       difftime(y$start[g], y$start[i], units = "mins") <= s$restart_minutes), TRUE)]
+      if (length(rs)) {
+        if (any(dec[rs])) {
+          why <- "an unfinished entry kept in an earlier week looks like a restart."
         } else {
-          for (i in unf) put(i, "R0", "drop", NA)
-          g <- setdiff(g, unf)
-          desc <- sprintf("%s (unfinished%s)", hms(unf),
-                          ifelse(is.na(y$progress[unf]), "", sprintf(", %s%%", format(y$progress[unf]))))
-          rest <- if (length(g) == 1) sprintf("%s kept.", hms(g)) else "finished entries exist for that date."
-          txt[[length(txt) + 1]] <- c("R0", sprintf("%s: %s dropped; %s", .qa_md(dd), paste(desc, collapse = " and "), rest))
+          for (i in rs) put(i, "R0", "drop", NA)
+          g <- setdiff(g, rs)
+          desc <- sprintf("%s (unfinished%s)", hms(rs),
+                          ifelse(is.na(y$progress[rs]), "", sprintf(", %s%%", format(y$progress[rs]))))
+          rest <- if (length(g) == 1) sprintf("%s kept.", hms(g)) else ""
+          txt[[length(txt) + 1]] <- c("R0", sprintf("%s: %s restarted within %d minutes, dropped. %s", .qa_md(dd),
+                                                    paste(desc, collapse = " and "), s$restart_minutes, rest))
           if (length(g) == 1 && !dec[g]) put(g, "R0", "keep", dd)
         }
       }
     }
 
+    gap_note <- ""
     if (is.null(why) && length(g) >= 2) {
-      if (!any(y$finished[g])) {
-        why <- sprintf("none of the %d entries was finished.", length(g))
-      } else {
-        moved <- FALSE
-        # R1: the night/day before is empty -> the earliest moves back one
-        if (!filled(dd - 1)) {
-          e <- g[1]
-          if (dec[e]) {
-            why <- "the earliest entry was decided in an earlier week, so it can't be moved back."
-          } else {
-            n_on <- length(g)
-            put(e, "R1", "move", dd - 1)
-            g <- g[-1]; moved <- TRUE
-            t1 <- sprintf("%d entries on %s and none on %s. the earliest (%s) moves to %s.", n_on, .qa_md(dd),
-                          .qa_md(dd - 1), ts(e), .qa_md(dd - 1))
-            if (length(g) == 1) {
-              t1 <- paste0(t1, .qa_cmp_text(cmp, y$.row[e], y$.row[g]))
-              if (!dec[g]) put(g, "R1", "keep", dd)
-            }
-            txt[[length(txt) + 1]] <- c("R1", t1)
-          }
+      # R1: empty nights/days right before -> the earliest entries fill them
+      m <- 0
+      while (!filled(dd - m - 1) && (dd - m - 1) >= first) m <- m + 1
+      reaches_first <- (dd - m) == first
+      n_move <- 0; targets <- as.Date(character())
+      if (dd == first) {
+        # first date: one entry may go to the night before, if it was started in the afternoon
+        h <- .qa_hour(y$start[g[1]])
+        if (kind == "night" && .qa_date(y$start[g[1]]) == dd && h >= s$r3_from && h < s$r3_until) {
+          n_move <- 1; targets <- dd - 1
         }
-        # R2: still 2+ -> keep the earliest finished, drop the rest
-        if (is.null(why) && length(g) >= 2) {
-          keeper <- g[y$finished[g]][1]
-          drops <- setdiff(g, keeper)
-          if (any(dec[drops])) {
-            why <- "an entry decided in an earlier week would be dropped."
-          } else {
-            if (!dec[keeper]) put(keeper, "R2", "keep", dd)
-            for (i in drops) put(i, "R2", "drop", NA)
-            t2 <- if (moved) sprintf("of the %d left, keep %s for %s and drop %s.", length(g), ts(keeper), .qa_md(dd),
-                                     paste(ts(drops), collapse = " and "))
-                  else sprintf("%d entries on %s and %s is filled. keep %s, drop %s.", length(g), .qa_md(dd),
-                               .qa_md(dd - 1), hms(keeper), paste(hms(drops), collapse = " and "))
-            if (length(drops) == 1) t2 <- paste0(t2, .qa_cmp_text(cmp, y$.row[keeper], y$.row[drops]))
-            txt[[length(txt) + 1]] <- c("R2", t2)
+      } else if (m >= 1 && m <= s$r1_max_gap && !reaches_first) {
+        n_move <- min(m, length(g) - 1)
+        targets <- dd - rev(seq_len(n_move))
+      } else if (m > s$r1_max_gap || (m >= 1 && reaches_first)) {
+        gap_note <- sprintf(" (the %d %ss before are empty: too long a gap to move entries back.)", m, unit)
+      }
+      if (n_move > 0) {
+        mv <- g[seq_len(n_move)]
+        if (any(dec[mv])) {
+          why <- "an entry decided in an earlier week would have to move back."
+        } else {
+          n_on <- length(g)
+          for (k in seq_along(mv)) put(mv[k], "R1", "move", targets[k])
+          g <- g[-seq_len(n_move)]
+          span <- if (n_move == 1) sprintf("none on %s", .qa_md(targets)) else
+            sprintf("none on %s-%s", .qa_md(targets[1]), .qa_md(targets[n_move]))
+          t1 <- if (n_move == 1) sprintf("%d entries on %s and %s. the earliest (%s) moves to %s.", n_on, .qa_md(dd),
+                                         span, ts(mv), .qa_md(targets))
+                else sprintf("%d entries on %s and %s. the earliest %d move back one each: %s.", n_on, .qa_md(dd), span,
+                             n_move, paste(sprintf("%s to %s", ts(mv), .qa_md(targets)), collapse = ", "))
+          if (length(g) == 1) {
+            if (n_move == 1) t1 <- paste0(t1, .qa_cmp_text(cmp, y$.row[mv], y$.row[g]))
+            if (!dec[g]) put(g, "R1", "keep", dd)
           }
+          txt[[length(txt) + 1]] <- c("R1", t1)
+        }
+      }
+      # R2: still 2+ -> keep one. Night entries all started from r2_evening_from
+      # on the date itself: the one closest to the usual start time; otherwise
+      # the earliest. Finished entries are preferred over unfinished ones.
+      if (is.null(why) && length(g) >= 2) {
+        cand <- g[y$finished[g]]
+        if (!length(cand)) cand <- g
+        evening <- kind == "night" && all(.qa_date(y$start[g]) == dd & .qa_hour(y$start[g]) >= s$r2_evening_from)
+        by_typ <- evening && !is.na(typical)
+        keeper <- if (by_typ) cand[which.min(abs(offset(cand, dd) - typical))] else cand[1]
+        drops <- setdiff(g, keeper)
+        if (any(dec[drops])) {
+          why <- "an entry decided in an earlier week would be dropped."
+        } else {
+          if (!dec[keeper]) put(keeper, "R2", "keep", dd)
+          for (i in drops) put(i, "R2", "drop", NA)
+          how <- if (by_typ) sprintf(" all were started after %02d:00 and this %s usually starts around %s, so keep the closest.",
+                                     s$r2_evening_from, if (grepl(",", y$person[1]) || grepl("2$", y$person[1])) "caregiver" else "participant",
+                                     clock(typical)) else ""
+          t2 <- if (length(plan) && any(vapply(plan, function(p) p$r == "R1", TRUE)))
+                  sprintf("of the %d left:%s keep %s for %s and drop %s.", length(g), how, ts(keeper), .qa_md(dd),
+                          paste(ts(drops), collapse = " and "))
+                else sprintf("%d entries on %s and %s.%s keep %s, drop %s.", length(g), .qa_md(dd),
+                             if (filled(dd - 1)) sprintf("%s is filled", .qa_md(dd - 1)) else "nothing can move back",
+                             how, hms(keeper), paste(hms(drops), collapse = " and "))
+          t2 <- paste0(t2, gap_note)
+          if (length(drops) == 1) t2 <- paste0(t2, .qa_cmp_text(cmp, y$.row[keeper], y$.row[drops]))
+          txt[[length(txt) + 1]] <- c("R2", t2)
         }
       }
     }
@@ -289,7 +354,7 @@
         rule[p$i] <- p$r; act[p$i] <- p$a
         if (p$a == "drop") { cur[p$i] <- NA } else { psd[p$i] <- p$sd; cur[p$i] <- p$sd }
       }
-      for (t in txt) add_ev(dd, t[1], t[2])
+      for (t in txt) add_ev(dd, t[1], gsub("  +", " ", trimws(t[2])))
     }
   }
   y$rule <- rule; y$action <- act; y$p_sd <- psd; y$cur <- cur

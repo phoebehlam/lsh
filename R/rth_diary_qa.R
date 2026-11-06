@@ -12,6 +12,14 @@
 #'   \item{night_cutoff}{Night diaries started before this hour count for the previous night (12).
 #'     Also the start of compliance 3 the next day.}
 #'   \item{night_ontime_until}{Night diaries started the next day before this hour are on time (4).}
+#'   \item{r1_max_gap}{R1: entries move back only into a run of at most this many empty nights/days (3)
+#'     right before the date. A longer gap is left as is.}
+#'   \item{r2_evening_from}{R2 (night diaries): when every entry on the date was started from this hour (16)
+#'     on the date itself, keep the one closest to the participant's usual start time.}
+#'   \item{typical_min_n}{Usual start time = median of the participant's entries that are alone on their
+#'     date; needs at least this many (3), otherwise R2 keeps the earliest.}
+#'   \item{restart_minutes}{R0: an unfinished entry followed by another within this many minutes (30) is
+#'     a restart and is dropped.}
 #'   \item{r3_from, r3_until}{R3: a single night entry started between these hours (12 to 19, i.e. before
 #'     the night diary link usually goes out) moves back one night when that night is empty.}
 #'   \item{morning_cutoff}{Morning diaries started before this hour count for the previous day (4).}
@@ -27,6 +35,10 @@ rth_diary_qa_settings <- function() {
     n_days = 15,
     night_cutoff = 12,
     night_ontime_until = 4,
+    r1_max_gap = 3,
+    r2_evening_from = 16,
+    typical_min_n = 3,
+    restart_minutes = 30,
     r3_from = 12,
     r3_until = 19,
     morning_cutoff = 4,
@@ -70,9 +82,13 @@ rth_diary_qa_settings <- function() {
 #' }
 #' Tagging rules, per participant and night/day:
 #' \itemize{
-#'   \item R0: unfinished entry and a finished one exists for the same date: drop the unfinished one.
-#'   \item R1: 2+ entries and the night/day before is empty: the earliest moves back one.
-#'   \item R2: 2+ entries and the night/day before is filled: keep the earliest finished one, drop the rest.
+#'   \item R0: an entry with no answers, or an unfinished entry restarted within 30 minutes: drop it.
+#'     (Other unfinished entries count like any entry: partial data are kept.)
+#'   \item R1: 2+ entries and 1-3 empty nights/days right before: the earliest entries fill them, one each,
+#'     nearest first. On a participant's first date, one night-diary entry started 12:00-19:00 can move to
+#'     the night before.
+#'   \item R2: 2+ entries left: keep one, drop the rest. Night entries all started after 16:00 on the date:
+#'     the one closest to the participant's usual start time; otherwise the earliest (finished ones first).
 #'   \item R3 (night diaries): one entry started 12:00-19:00 and the night before is empty (not the
 #'     participant's first entry): it moves back one night.
 #'   \item R99: anything else that looks off (e.g. an entry that took 0 seconds): needs a decision.

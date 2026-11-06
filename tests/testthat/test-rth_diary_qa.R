@@ -70,17 +70,35 @@ test_that("step 1 tags each simulated situation with the agreed rule", {
   expect_equal(get("9032", "2026-10-05 12:48:28")$proposed_should_date, as.Date("2026-10-04"))
   # one caregiver, two teens: one set of rows
   expect_equal(sum(cg$id == "9042, 9052"), 2)
-  expect_equal(get("9042, 9052", "2026-07-13 21:29:37")$proposed_action, "drop")
-  # R0: unfinished restarts dropped
+  # evening duplicates, night before filled: keep the one nearest the usual time (~21:00)
+  expect_equal(get("9042, 9052", "2026-07-13 21:29:37")$proposed_action, "keep")
+  expect_equal(get("9042, 9052", "2026-07-13 17:36:46")$proposed_action, "drop")
+  # next-morning duplicates still keep the earliest
+  expect_equal(get("9012", "2026-07-08 08:20:16")$proposed_action, "keep")
+  # R0: restarts (unfinished, another entry within 30 min) dropped
   expect_equal(cg$proposed_action[cg$id == "9062" & cg$finished == 0], c("drop", "drop", "drop"))
+  # R1 fills 2 empty nights with the earliest of 3 entries, nearest first
+  expect_equal(get("9092", "2026-10-04 22:28:51")$proposed_should_date, as.Date("2026-10-02"))
+  expect_equal(get("9092", "2026-10-04 22:34:23")$proposed_should_date, as.Date("2026-10-03"))
+  expect_equal(get("9092", "2026-10-04 22:37:52")$proposed_action, "keep")
+  # R0: opened but nothing answered
+  expect_equal(c(get("9092", "2026-10-08 22:05:00")$rule, get("9092", "2026-10-08 22:05:00")$proposed_action), c("R0", "drop"))
   # untouched caregiver isn't listed
   expect_false("9082" %in% cg$id)
   # morning: 01:31 entry counts for the previous day and isn't tagged; R1 + R2
   am <- qa_props(pp, "adolescent_morning")
-  expect_equal(am$rule, c("R2", "R2", "R1", "R1"))
+  expect_equal(am$rule[am$id %in% c("9011", "9031")], c("R2", "R2", "R1", "R1"))
   expect_equal(am$proposed_should_date[am$startdate == "2026-10-10 06:58:14"], as.Date("2026-10-09"))
+  # a week-long gap before: nothing moves back; R2 keeps the earlier (7 am) entry
+  g <- am[am$id == "9061", ]
+  expect_equal(g$rule, c("R2", "R2"))
+  expect_equal(g$proposed_action[g$startdate == "2026-08-26 14:49:45"], "drop")
   an <- qa_props(pp, "adolescent_night")
   expect_equal(sort(unique(an$rule)), c("R0", "R1"))
+  # an unfinished entry with answers is kept and moved back like any other
+  u <- an[an$startdate == "2026-08-30 12:32:30", ]
+  expect_equal(c(u$finished, u$rule, u$proposed_action), c(0, "R1", "reassign"))
+  expect_equal(u$proposed_should_date, as.Date("2026-08-29"))
   # report lists previews, rows without an ID, and a caregiver ID in a teen diary
   html <- paste(readLines(rep, warn = FALSE), collapse = "\n")
   expect_match(html, "1 preview or test response is left out")
@@ -114,7 +132,7 @@ test_that("step 2 writes the log and clean data; week 2 only proposes new entrie
   logp <- file.path(out, "rth_diary_qa_decisions_log.xlsx")
   expect_true(file.exists(logp))
   lg <- .qa_read_book(logp, .qa_log_cols)
-  expect_equal(nrow(lg$caregiver_night), 17)
+  expect_equal(nrow(lg$caregiver_night), 21)
   expect_equal(lg$caregiver_night$source[lg$caregiver_night$startdate == "2026-07-18 14:36:03"], "override")
   expect_equal(sum(lg$caregiver_night$source == "override"), 3)            # 2 needed a decision + 1 changed
   for (tp in names(clean)) expect_true(file.exists(file.path(out, sprintf("rth_%s_qa_2026-11-06.sav", tp))))
@@ -135,8 +153,8 @@ test_that("step 2 writes the log and clean data; week 2 only proposes new entrie
   expect_equal(as.numeric(r1$compliance), 3)
   ov <- cg[format(cg$startdate, tz = "UTC") == "2026-07-18 14:36:03", ]
   expect_equal(c(as.character(ov$should_date), ov$qa_source), c("2026-07-18", "override"))
-  # dropped: 08:44:03, 21:29:37 (once per teen), 3 unfinished restarts, 20:00:00, and the row without an ID
-  expect_equal(sum(cg$exclude == 1), 8)
+  # dropped: 08:44:03, 17:36:46 (once per teen), 3 restarts, 20:00:00, 1 empty entry, and the row without an ID
+  expect_equal(sum(cg$exclude == 1), 9)
   expect_true(all(is.na(cg$compliance[cg$exclude == 1])))
 
   # Week 2: a new export with one more entry; earlier decisions are not proposed again
@@ -157,8 +175,8 @@ test_that("step 2 writes the log and clean data; week 2 only proposes new entrie
   expect_equal(nrow(qa_props(p2, "adolescent_morning")), 0)
   clean2 <- qa_run(out, files = f2, proposals = p2, run_date = "2026-11-13")
   lg2 <- .qa_read_book(logp, .qa_log_cols)
-  expect_equal(nrow(lg2$caregiver_night), 19)
-  expect_equal(sum(clean2$caregiver_night$exclude == 1), 9)
+  expect_equal(nrow(lg2$caregiver_night), 23)
+  expect_equal(sum(clean2$caregiver_night$exclude == 1), 10)
 })
 
 test_that("step 1 with no diaries or a missing file stops with a clear message", {

@@ -155,9 +155,14 @@
              sprintf("before %02d:00", s$morning_ontime_until),
              sprintf("%02d:00&ndash;23:59", s$morning_ontime_until), "next day or later"), wrap = 2)))
   tags <- .qa_table(c("rule", "diaries", "when", "proposal"), c(
-    .qa_tr(c("R0", "all", "unfinished entry, and a finished one exists for the same night or day", "drop the unfinished one"), wrap = 3:4),
-    .qa_tr(c("R1", "all", "2+ entries on a night or day, and the one before is empty", "move the earliest back one"), wrap = 3:4),
-    .qa_tr(c("R2", "all", "2+ entries on a night or day, and the one before is filled", "keep the earliest finished one, drop the rest"), wrap = 3:4),
+    .qa_tr(c("R0", "all", sprintf("an entry with no answers, or an unfinished entry restarted within %d minutes (other unfinished entries count like any entry)", s$restart_minutes),
+             "drop it"), wrap = 3:4),
+    .qa_tr(c("R1", "all", sprintf("2+ entries on a night or day, and 1&ndash;%d empty ones right before it. on a participant's first date: one night-diary entry started %02d:00&ndash;%02d:00",
+                                  s$r1_max_gap, s$r3_from, s$r3_until),
+             "the earliest entries fill the empty ones, one each, nearest first"), wrap = 3:4),
+    .qa_tr(c("R2", "all", "2+ entries left on a night or day",
+             sprintf("keep one, drop the rest. night entries all started after %02d:00 on the date: the one closest to the participant's usual start time (median of their other entries); otherwise the earliest. finished entries first",
+                     s$r2_evening_from)), wrap = 3:4),
     .qa_tr(c("R3", "night only", sprintf("1 entry started between %02d:00 and %02d:00, and the night before is empty (not for a participant's first entry)",
                                          s$r3_from, s$r3_until), "move it back one night"), wrap = 3:4),
     .qa_tr(c("R99", "all", "none of the above fits, or something looks off (e.g. an entry that took 0 seconds, or a clash with an earlier week's decision)",

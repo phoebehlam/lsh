@@ -8,18 +8,21 @@ proposals are reviewed – writes clean data and keeps a log of every decision.
 
 ```r
 library(lsh)
-cg <- "rth_caregiver night diary_November 13, 2026_13.14.sav"
-an <- "rth_adolescent night diary_November 13, 2026_13.15.sav"
-am <- "rth_adolescent morning diary_November 13, 2026_13.15.sav"
 
 # step 1: report + proposals
-rth_diary_qa(cg, an, am, out_dir = "diary qa")
+rth_diary_qa(caregiver_night    = "rth_caregiver night diary_November 13, 2026_13.14.sav",
+             adolescent_night   = "rth_adolescent night diary_November 13, 2026_13.15.sav",
+             adolescent_morning = "rth_adolescent morning diary_November 13, 2026_13.15.sav",
+             out_dir = "diary qa")
 
 # open diary qa/rth_diary_qa_proposals_2026-11-13.xlsx, change final_action /
 # final_should_date where you disagree, fill in the "needs a decision" rows
 
 # step 2: same exports + the reviewed proposals
-rth_diary_qa(cg, an, am, proposals = "diary qa/rth_diary_qa_proposals_2026-11-13.xlsx",
+rth_diary_qa(caregiver_night    = "rth_caregiver night diary_November 13, 2026_13.14.sav",
+             adolescent_night   = "rth_adolescent night diary_November 13, 2026_13.15.sav",
+             adolescent_morning = "rth_adolescent morning diary_November 13, 2026_13.15.sav",
+             proposals = "diary qa/rth_diary_qa_proposals_2026-11-13.xlsx",
              out_dir = "diary qa")
 ```
 
@@ -45,9 +48,15 @@ new tagged entries that aren't in the proposals file (then run step 1 again).
   diaries started before 04:00 count for the previous day.
 - **Compliance.** Night: 1 = on time (by 04:00 next day), 2 = 04:00–11:59 next day,
   3 = 12:00 next day or later. Morning: 1 = before 14:00, 2 = 14:00–23:59, 3 = next day or later.
-- **R0** unfinished entry and a finished one for the same date → drop the unfinished one.
-- **R1** 2+ entries, the night/day before is empty → the earliest moves back one.
-- **R2** 2+ entries, the night/day before is filled → keep the earliest finished one, drop the rest.
+- **R0** an entry with no answers, or an unfinished entry restarted within 30 minutes → drop it.
+  Other unfinished entries count like any entry (partial answers are kept).
+- **R1** 2+ entries on a date and 1–3 empty nights/days right before it → the earliest entries
+  fill the empty ones, one each, nearest first (3 entries after 2 empty nights → one per night).
+  A longer gap is left alone. On a participant's first date, one night-diary entry started
+  12:00–19:00 can move to the night before.
+- **R2** 2+ entries left → keep one, drop the rest. Night entries all started after 16:00 on
+  the date: keep the one closest to the participant's usual start time (median of their other
+  entries). Otherwise keep the earliest. Finished entries are preferred.
 - **R3** (night diaries) one entry started 12:00–19:00, the night before is empty, not the
   participant's first entry → it moves back one night.
 - **R99** anything that looks off (e.g. an entry that took 0 seconds, or a clash with an

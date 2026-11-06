@@ -14,6 +14,14 @@ nights/days the report lists.}
 \item{night_cutoff}{Night diaries started before this hour count for the previous night (12).
 Also the start of compliance 3 the next day.}
 \item{night_ontime_until}{Night diaries started the next day before this hour are on time (4).}
+\item{r1_max_gap}{R1: entries move back only into a run of at most this many empty nights/days (3)
+right before the date. A longer gap is left as is.}
+\item{r2_evening_from}{R2 (night diaries): when every entry on the date was started from this hour (16)
+on the date itself, keep the one closest to the participant's usual start time.}
+\item{typical_min_n}{Usual start time = median of the participant's entries that are alone on their
+date; needs at least this many (3), otherwise R2 keeps the earliest.}
+\item{restart_minutes}{R0: an unfinished entry followed by another within this many minutes (30) is
+a restart and is dropped.}
 \item{r3_from, r3_until}{R3: a single night entry started between these hours (12 to 19, i.e. before
 the night diary link usually goes out) moves back one night when that night is empty.}
 \item{morning_cutoff}{Morning diaries started before this hour count for the previous day (4).}
