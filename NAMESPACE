@@ -2,6 +2,8 @@
 
 export(render_rth_feedback)
 export(render_rth_recruitment)
+export(rth_diary_qa)
+export(rth_diary_qa_settings)
 export(rth_settings)
 export(rth_sleeplog)
 export(wc_idfkids)
