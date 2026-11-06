@@ -20,7 +20,8 @@ render_rth_recruitment(
   hourly_rates = c(`Lab manager` = 21.5 * 1.256, `Grad student` = 30000/520),
   lm_hours_tab = "lab manager hours",
   lm_week_hours = 37.5,
-  source_groups = .rth_source_groups
+  source_groups = .rth_source_groups,
+  bots_tab = "sus bots"
 )
 }
 \arguments{
@@ -70,6 +71,10 @@ other hours, for the "Lab manager's week" bar.}
 c("screener choice" = "group"). Default: paper flyers, mail, bus ads and
 the candy stickers are grouped as "Local recruitment" (in the costs
 section too). Use \code{character()} to report every choice separately.}
+
+\item{bots_tab}{Tab of the tracking sheet listing screener IDs that are
+bots ("Screener ID" column). Those screeners count as possible bots
+whatever their answers. Skipped if the tab doesn't exist.}
 }
 \value{
 Path to the HTML report (invisibly).

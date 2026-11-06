@@ -210,3 +210,19 @@ score_race <- function(race) {
     is("asian") ~ "Multiracial Asian",
     TRUE ~ "Multiracial, another race")
 }
+
+#' Screener IDs on the tracker's "sus bots" tab
+#'
+#' Reads the "Screener ID" column (matched loosely). Returns NULL if the tab
+#' doesn't exist (or the tracker was given as a data frame).
+#' @keywords internal
+read_sus_bots <- function(tracker, sheet = "sus bots") {
+  if (is.data.frame(tracker)) return(NULL)
+  raw <- tryCatch(.flatten_sheet(.tracker_raw(tracker, sheet, must_have_tab = TRUE)), error = function(e) {
+    if (grepl("No '.*' tab|Can't find|not found", conditionMessage(e))) NULL else stop(e) })
+  if (is.null(raw)) return(NULL)
+  j <- match("screenerid", .key(names(raw)))
+  if (is.na(j)) stop(sprintf("The '%s' tab needs a 'Screener ID' column.", sheet), call. = FALSE)
+  v <- trimws(raw[[j]])
+  unique(v[!.is_blank(v)])
+}

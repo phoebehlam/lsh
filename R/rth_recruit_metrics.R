@@ -76,8 +76,11 @@ link_steps <- function(scr, fam) {
   survey <- has("cg_survey")
   interview <- has("interview")
   consent <- has("consent") | interview | survey | sched
-  tibble::tibble(family = linked$family[m], consent = consent, interview = interview,
-                 survey = survey, sched = sched, lab = lab)
+  # possible bots are left out of every step (a tracker family linked to one is
+  # listed in the checks: usually a mistyped screener ID)
+  real <- !(scr$bot %in% TRUE)
+  tibble::tibble(family = linked$family[m], consent = consent & real, interview = interview & real,
+                 survey = survey & real, sched = sched & real, lab = lab & real)
 }
 
 # One conversion row: counts and %. Eligible is out of completed screeners
@@ -133,6 +136,15 @@ tracker_checks <- function(scr, tr, fam, steps, report_date, wait_days = 14, dia
   has <- attr(tr, "has")
   fid <- function(f) unique(tr$rth_id[tr$family %in% f])
 
+  # Eligible but never submitted (closed as in-progress), last 8 weeks, not in
+  # the tracker. Closed in-progress responses don't trigger the eligibility
+  # email unless the workflow has "Include incomplete responses" ticked.
+  ue <- scr$unfinished_eligible %in% TRUE & is.na(steps$family) & !is.na(scr$date) & scr$date > report_date - 56
+  o <- which(ue)[order(scr$date[ue], decreasing = TRUE)]
+  add("Eligible, but didn't finish the screener (last 8 weeks, not in the tracker)",
+      sprintf("%s (started %s)", ifelse(is.na(scr$screener_id[o]), scr$response_id[o], scr$screener_id[o]), format(scr$date[o], "%m/%d/%Y")),
+      "They got far enough to be marked eligible but never submitted, so they probably didn't get the eligibility email. Contact them, or add them to the tracker once they sign up.")
+
   # IDs
   add("RTH ID cells that aren't a single 4-digit ID ending in 1 or 2",
       sprintf("row %d: %s", tr$sheet_row[is.na(tr$rth_id) | is.na(tr$role)], tr$rth_id_raw[is.na(tr$rth_id) | is.na(tr$role)]),
@@ -152,13 +164,17 @@ tracker_checks <- function(scr, tr, fam, steps, report_date, wait_days = 14, dia
         sprintf("%s (RTH %s)", fam$screener_id, vapply(fam$family, function(f) paste(fid(f), collapse = "/"), ""))[
           !is.na(fam$screener_id) & !fam$screener_id %in% known],
         "Usually a typo.")
+    b <- scr$bot & !is.na(steps$family)
+    add("Families in the tracker whose screener counts as a possible bot",
+        sprintf("%s (RTH %s)", scr$screener_id[b], vapply(steps$family[b], function(f) paste(fid(f), collapse = "/"), "")),
+        "Check the screener ID (a typo can point to a bot's screener). If it's right, take it off the 'sus bots' tab. Until then the family is left out of conversion.")
   } else {
     add("The tracker has no 'screener ID' column yet", "add the column", "Sources can't be linked to consents and lab visits until it's added.")
   }
 
   # Follow-ups
   # recent enough to follow up: screened 2-8 weeks ago (newest first)
-  old_el <- scr$eligible & !scr$screened_out & !is.na(scr$date) & is.na(steps$family) &
+  old_el <- scr$eligible & !(scr$unfinished_eligible %in% TRUE) & !scr$screened_out & !is.na(scr$date) & is.na(steps$family) &
     scr$date <= report_date - wait_days & scr$date > report_date - 56
   o <- which(old_el)[order(scr$date[old_el], decreasing = TRUE)]
   add("Eligible screeners from 2 to 8 weeks ago with no family in the tracker",
@@ -206,14 +222,14 @@ completion_table <- function(tr, report_date) {
 
 .outcome_levels <- c("Eligible (child 14-17)", "Eligible (child 18)", "Not marked eligible, but enrolled",
                      "Needs review: diagnosis reported", "Needs review: possible repeat screener",
-                     "Possible bot (low reCAPTCHA score)",
+                     "Possible bot",
                      "Incomplete answers", "Ineligible", "Didn't finish screener",
                      "No status recorded", "Screened out (blocked IP/location)")
 
 outcome_counts <- function(scr, sel = rep(TRUE, nrow(scr))) {
   t <- table(factor(scr$outcome[sel], levels = .outcome_levels))
   always <- c("Eligible (child 14-17)", "Eligible (child 18)", "Needs review: diagnosis reported",
-              "Possible bot (low reCAPTCHA score)", "Incomplete answers", "Ineligible")
+              "Possible bot", "Incomplete answers", "Ineligible")
   t <- t[t > 0 | names(t) %in% always]
   stats::setNames(as.integer(t), names(t))
 }

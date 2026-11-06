@@ -198,3 +198,14 @@ lmh <- data.frame(date = days, day = format(days, "%a"), `in-person recruitment 
                   notes = ifelse(days == as.Date("2026-10-29"), "Other: IT ticket for lab laptop", NA), check.names = FALSE)
 openxlsx::write.xlsx(list(`how to use` = data.frame(x = "Simulated costs sheet (not real)."), costs = costs,
                           `lab manager hours` = lmh), file.path(out, "sim_costs.xlsx"))
+
+# "sus bots" tab on the tracker: 3 eligible-looking screeners judged to be bots ---------------
+pre <- haven::read_sav(file.path(out, "sim_prescreen.sav"))
+trk_ids <- as.character(openxlsx::read.xlsx(file.path(out, "sim_tracking.xlsx"), check.names = FALSE, sep.names = " ")$`screener ID`)
+cand <- as.character(pre$screenerid[grepl("_eligible_under18$", pre$eligi_status) & !as.character(pre$screenerid) %in% trk_ids])
+set.seed(77)
+wb <- openxlsx::loadWorkbook(file.path(out, "sim_tracking.xlsx"))
+openxlsx::addWorksheet(wb, "sus bots")
+openxlsx::writeData(wb, "sus bots", data.frame(`Screener ID` = sample(cand, 3), why = "odd answers, same IP",
+                                               check.names = FALSE))
+openxlsx::saveWorkbook(wb, file.path(out, "sim_tracking.xlsx"), overwrite = TRUE)

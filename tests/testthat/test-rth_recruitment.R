@@ -341,10 +341,11 @@ test_that("write-ins never show emails or phone numbers; low reCAPTCHA scores co
   expect_false(grepl("555-0199|jane doe", h))
   expect_match(h, "\\[email removed\\]")
   fam <- tracker_families(read_tracker(rec_ex("sim_tracking.xlsx")), rd)
-  s <- read_screener(f, approved = fam$screener_id)
+  sus <- read_sus_bots(rec_ex("sim_tracking.xlsx"))
+  s <- read_screener(f, approved = fam$screener_id, bots = sus)
   low <- !s$screened_out & s$recaptcha < 0.5
-  enrolled <- low & s$outcome == "Not marked eligible, but enrolled"
-  expect_equal(sum(s$bot), sum(low) - sum(enrolled))                     # bots by score alone, unless enrolled
+  flag <- grepl("recaptcha", raw$eligi_status[as.numeric(raw$Status) %in% c(0, 4, 16)])
+  expect_equal(sum(s$bot), sum((low | flag | s$screener_id %in% sus) & !s$screened_out))
   expect_match(h, sprintf("whether or not the screener was finished: [0-9]+ this week, %d all time", sum(s$bot)))
   expect_false(any(s$completed & s$bot)); expect_false(any(s$completed & s$outcome == "Didn't finish screener"))
 })
@@ -383,4 +384,62 @@ test_that("screener demographics use completed screeners only", {
   dm <- screener_demographics(s)
   expect_equal(dm$n_eligible + dm$n_not_eligible, sum(s$completed))
   expect_true(sum(s$bot) > 0 && sum(s$outcome == "Didn't finish screener") > 0)
+})
+
+test_that("possible bot overrides every outcome: low score, 'sus bots' tab, or survey flag", {
+  raw <- haven::read_sav(rec_ex("sim_prescreen.sav"))
+  raw <- raw[as.numeric(raw$Status) %in% c(0, 4, 16) & raw$Q_TerminateFlag == "", ]       # same rows as read_screener
+  el <- which(grepl("_eligible_under18$", raw$eligi_status))[1:3]
+  rv <- which(grepl("_unsure_disorder$", raw$eligi_status))[1]
+  raw$Q_RecaptchaScore <- 0.9
+  raw$Q_RecaptchaScore[c(el[1], rv)] <- 0.3                               # eligible and needs-review with low scores
+  f <- tempfile(fileext = ".sav"); haven::write_sav(raw, f)
+  ids <- as.character(raw$screenerid)
+  s <- read_screener(f, approved = ids[el[1]], bots = ids[el[2]])        # el[1] even "enrolled" -> still a bot
+  expect_equal(s$outcome[c(el[1], el[2], rv)], rep("Possible bot", 3))
+  expect_equal(s$bot_why[c(el[1], el[2], rv)], c("score", "sus bots tab", "score"))
+  expect_false(any(s$eligible[c(el[1], el[2], rv)] | s$completed[c(el[1], el[2], rv)]))
+  expect_equal(s$outcome[el[3]], "Eligible (child 14-17)")
+  # bots drop out of every conversion step
+  df <- data.frame(`RTH ID` = c("9011", "9012"), `adolescent or caregiver?` = c("adolescent", "caregiver"),
+                   `screener ID` = ids[el[1]], `consent signed date` = c("", "9/1/2026"), check.names = FALSE)
+  tr <- read_tracker(df); fam <- tracker_families(tr, rd); st <- link_steps(s, fam)
+  expect_false(st$consent[el[1]])
+  ck <- tracker_checks(s, tr, fam, st, rd)
+  n <- stats::setNames(vapply(ck, `[[`, 0L, "n"), vapply(ck, `[[`, "", "label"))
+  expect_equal(n[["Families in the tracker whose screener counts as a possible bot"]], 1L)
+})
+
+test_that("the tracker's 'sus bots' tab is read and kept out of the eligible follow-up list", {
+  sus <- read_sus_bots(rec_ex("sim_tracking.xlsx"))
+  expect_length(sus, 3)
+  expect_null(read_sus_bots(rec_ex("sim_costs.xlsx")))                  # no such tab
+  s0 <- read_screener(rec_ex("sim_prescreen.sav")); s1 <- read_screener(rec_ex("sim_prescreen.sav"), bots = sus)
+  expect_equal(sum(s1$bot) - sum(s0$bot), sum(s0$screener_id %in% sus & !s0$bot))
+  d <- file.path(tempdir(), "rec_sus"); unlink(d, recursive = TRUE)
+  p <- suppressMessages(render_rth_recruitment(rec_ex("sim_prescreen.sav"), rec_ex("sim_tracking.xlsx"), out_dir = d,
+                                               report_date = as.Date(max(s1$date[s1$screener_id %in% sus]) + 20)))
+  h <- paste(readLines(p, warn = FALSE), collapse = " ")
+  for (id in sus) expect_false(grepl(sprintf("<li>%s \\(screened", id), h))
+  expect_match(h, "&ldquo;sus bots&rdquo; tab")
+})
+
+test_that("eligible screeners closed as in-progress are listed first in the tracker checks, with start date", {
+  raw <- haven::read_sav(rec_ex("sim_prescreen.sav"))
+  raw <- raw[as.numeric(raw$Status) %in% c(0, 4, 16) & raw$Q_TerminateFlag == "", ]
+  raw$StartDate <- as.POSIXct("2026-10-20 10:00", tz = "UTC") - (seq_len(nrow(raw)) %% 30) * 86400
+  trk <- as.character(openxlsx::read.xlsx(rec_ex("sim_tracking.xlsx"), check.names = FALSE, sep.names = " ")$`screener ID`)
+  j <- which(grepl("_eligible_under18$", raw$eligi_status) & !as.character(raw$screenerid) %in% trk)[1:2]
+  raw$Finished[j] <- 0
+  f <- tempfile(fileext = ".sav"); haven::write_sav(raw, f)
+  s <- read_screener(f)
+  expect_true(all(s$unfinished_eligible[j]))
+  expect_equal(sum(s$unfinished_eligible), length(j))
+  tr <- read_tracker(rec_ex("sim_tracking.xlsx")); fam <- tracker_families(tr, rd)
+  ck <- tracker_checks(s, tr, fam, link_steps(s, fam), rd)
+  expect_equal(ck[[1]]$label, "Eligible, but didn't finish the screener (last 8 weeks, not in the tracker)")
+  expect_equal(ck[[1]]$n, 2L)
+  expect_true(all(grepl("\\(started [0-9]{2}/[0-9]{2}/2026\\)", ck[[1]]$ids)))
+  old <- ck[[which(vapply(ck, `[[`, "", "label") == "Eligible screeners from 2 to 8 weeks ago with no family in the tracker")]]
+  expect_false(any(vapply(as.character(raw$screenerid[j]), function(i) any(grepl(i, old$ids)), TRUE)))   # not listed twice
 })

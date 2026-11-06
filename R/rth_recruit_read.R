@@ -67,7 +67,7 @@ rth_study_week <- function(date, study_start) {
 #' @keywords internal
 .bot_cut <- 0.5
 
-read_screener <- function(path, approved = character()) {
+read_screener <- function(path, approved = character(), bots = character()) {
   raw <- haven::read_sav(path)
   raw <- .drop_previews(raw)
   n <- nrow(raw)
@@ -84,24 +84,34 @@ read_screener <- function(path, approved = character()) {
     grepl("_eligible_under18$", status) ~ "Eligible (child 14-17)",
     grepl("_eligible_18$", status) ~ "Eligible (child 18)",
     grepl("_unsure_disorder$", status) ~ "Needs review: diagnosis reported",
-    grepl("_unsure_recaptcha$", status) ~ "Possible bot (low reCAPTCHA score)",
+    grepl("_unsure_recaptcha$", status) ~ "Possible bot",
     grepl("_unsure_duplicate$", status) ~ "Needs review: possible repeat screener",
     grepl("_unsure$", status) ~ "Incomplete answers",
     grepl("_ineligible$", status) ~ "Ineligible",
     !finished ~ "Didn't finish screener",
     TRUE ~ "No status recorded")
 
-  # Possible bot = reCAPTCHA score below 0.5, whatever the answers and whether
-  # or not the screener was finished (the survey flow only flags otherwise-
-  # eligible caregivers). Without the score in the export, only the survey
-  # flow's flag is available. Families later enrolled count as real (below).
-  rc <- suppressWarnings(as.numeric(col("Q_RecaptchaScore")))
-  outcome[!is.na(rc) & rc < .bot_cut & !screened_out] <- "Possible bot (low reCAPTCHA score)"
-
   sid <- .clean_id(col("screenerid"))
   rid <- as.character(col("ResponseId"))
-  ok_review <- ((!is.na(sid) & sid %in% .clean_id(approved)) | (!is.na(rid) & rid %in% .clean_id(approved))) & !screened_out
+  in_list <- function(ids) { ids <- .clean_id(ids); (!is.na(sid) & sid %in% ids) | (!is.na(rid) & rid %in% ids) }
+  ok_review <- in_list(approved) & !screened_out
   outcome[ok_review & !grepl("^Eligible", outcome)] <- "Not marked eligible, but enrolled"
+
+  # Possible bot, whatever the answers and whether or not the screener was
+  # finished (this overrides every other outcome): a reCAPTCHA score below 0.5,
+  # a screener ID on the tracker's "sus bots" tab, or the survey flow's own flag
+  # (which only covers otherwise-eligible caregivers, and is all there is for
+  # screeners from before scores were saved).
+  rc <- suppressWarnings(as.numeric(col("Q_RecaptchaScore")))
+  listed <- in_list(bots)
+  low <- !is.na(rc) & rc < .bot_cut
+  flagged <- grepl("_unsure_recaptcha$", status)
+  is_bot <- (listed | low | flagged) & !screened_out
+  outcome[is_bot] <- "Possible bot"
+  bot_why <- ifelse(!is_bot, NA_character_, ifelse(listed, "sus bots tab", ifelse(low, "score", "survey flag")))
+  # got far enough to be marked eligible, but never submitted the screener
+  # (closed as in-progress): the eligibility email usually doesn't go out
+  unfinished_eligible <- !finished & grepl("_eligible_(under18|18)$", status) & !is_bot & !screened_out
 
   # Ineligible reasons, using the same rules as the screener's survey flow
   age <- .lab(col("age"))
@@ -153,9 +163,11 @@ read_screener <- function(path, approved = character()) {
     screened_out = screened_out,
     outcome = outcome,
     eligible = grepl("^Eligible", outcome) | outcome == "Not marked eligible, but enrolled",
-    bot = outcome == "Possible bot (low reCAPTCHA score)",
+    bot = outcome == "Possible bot",
+    bot_why = bot_why,
+    unfinished_eligible = unfinished_eligible,
     # finished, and not a possible bot: the base for every %
-    completed = !screened_out & !outcome %in% c("Didn't finish screener", "Possible bot (low reCAPTCHA score)"),
+    completed = !screened_out & !outcome %in% c("Didn't finish screener", "Possible bot"),
     age = age,
     income = .lab(col("income")),
     race_group = score_race(race),

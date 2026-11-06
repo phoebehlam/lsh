@@ -34,6 +34,9 @@
 #' @param lm_hours_tab Tab of the costs sheet where the lab manager logs his
 #'   other hours, for the "Lab manager's week" bar.
 #' @param lm_week_hours Hours in the lab manager's full work week.
+#' @param bots_tab Tab of the tracking sheet listing screener IDs that are
+#'   bots ("Screener ID" column). Those screeners count as possible bots
+#'   whatever their answers. Skipped if the tab doesn't exist.
 #' @param source_groups Screener sources to report together, as
 #'   c("screener choice" = "group"). Default: paper flyers, mail, bus ads and
 #'   the candy stickers are grouped as "Local recruitment" (in the costs
@@ -46,7 +49,7 @@ render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, 
                                    tracker_tab = "tracking", costs = FALSE, costs_sheet = NULL, costs_tab = "costs",
                                    hourly_rates = c("Lab manager" = 21.50 * 1.256, "Grad student" = 30000 / 520),
                                    lm_hours_tab = "lab manager hours", lm_week_hours = 37.5,
-                                   source_groups = .rth_source_groups) {
+                                   source_groups = .rth_source_groups, bots_tab = "sus bots") {
   study_start <- as.Date(study_start); report_date <- as.Date(report_date)
   for (f in c(screener_sav, interview_sav, seed_sheet))
     if (!file.exists(f)) stop("File not found: ", f, call. = FALSE)
@@ -59,7 +62,9 @@ render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, 
 
   tr <- read_tracker(tracker, tracker_tab)
   fam <- tracker_families(tr, report_date)
-  scr <- .group_sources(read_screener(screener_sav, approved = fam$screener_id), source_groups)
+  sus <- read_sus_bots(tracker, bots_tab)
+  if (is.null(sus) && !is.data.frame(tracker)) message("No '", bots_tab, "' tab in the tracker; only reCAPTCHA scores and the survey's flag mark bots.")
+  scr <- .group_sources(read_screener(screener_sav, approved = fam$screener_id, bots = sus), source_groups)
   ses <- if (!is.null(interview_sav)) read_interview_ses(interview_sav) else NULL
   seed <- if (!is.null(seed_sheet)) read_seed_sheet(seed_sheet) else NULL
 
@@ -208,19 +213,18 @@ plot_completion <- function(ct) {
 # "possible bot" status to otherwise-eligible caregivers, so most low scores
 # end up under Ineligible, Didn't finish, etc.
 .recaptcha_note <- function(scr, in_week, cut = .bot_cut) {
-  ok <- !scr$screened_out; rc <- scr$recaptcha
-  has <- ok & !is.na(rc)
-  if (!any(has)) return(paste0('<p class="note"><b>Possible bots:</b> reCAPTCHA scores aren&rsquo;t in this export, so only ',
-                               'screeners the survey flagged are counted (it flags only otherwise-eligible caregivers). ',
-                               'Possible bots are left out of completed screeners and every %.</p>'))
-  b <- ok & scr$bot
-  sprintf(paste0('<p class="note"><b>Possible bots</b> = reCAPTCHA score below %.1f, whatever the answers and whether or not ',
-                 'the screener was finished: %d this week, %d all time (%d of them finished the screener). ',
-                 'Possible bots are left out of completed screeners and every %%. ',
-                 'Families who later enrolled count as real.%s</p>'),
-          cut, sum(b & in_week), sum(b), sum(b & scr$finished),
-          if (any(ok & is.na(rc))) sprintf(" %d screeners have no score (from before scores were saved)%s.", sum(ok & is.na(rc)),
-            if (any(b & is.na(rc))) sprintf("; %d of those were flagged by the survey and are counted too", sum(b & is.na(rc))) else "") else "")
+  ok <- !scr$screened_out; b <- ok & scr$bot
+  why <- function(w) sum(b & scr$bot_why %in% w)
+  parts <- c(if (why("score")) sprintf("%d with a reCAPTCHA score below %.1f", why("score"), cut),
+             if (why("sus bots tab")) sprintf("%d on the tracker&rsquo;s &ldquo;sus bots&rdquo; tab", why("sus bots tab")),
+             if (why("survey flag")) sprintf("%d flagged by the survey (no score saved)", why("survey flag")))
+  no_score <- sum(ok & is.na(scr$recaptcha))
+  sprintf(paste0('<p class="note"><b>Possible bots</b> = a reCAPTCHA score below %.1f, a screener ID on the tracker&rsquo;s ',
+                 '&ldquo;sus bots&rdquo; tab, or the survey&rsquo;s own bot flag, whatever the answers and whether or not the ',
+                 'screener was finished: %d this week, %d all time%s. They&rsquo;re left out of completed screeners and every %%.%s</p>'),
+          cut, sum(b & in_week), sum(b), if (length(parts)) paste0(" (", paste(parts, collapse = "; "), ")") else "",
+          if (all(is.na(scr$recaptcha[ok]))) " reCAPTCHA scores aren&rsquo;t in this export."
+          else if (no_score) sprintf(" %d screeners have no score (from before scores were saved).", no_score) else "")
 }
 
 # "Local recruitment = Paper flyer, Mail, ..." for each group in the report
