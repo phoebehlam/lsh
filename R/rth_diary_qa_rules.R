@@ -58,6 +58,22 @@
   out
 }
 
+# Binged entries kept: entries for the same date done in one sitting (each
+# started within `hours` of the previous one), 2 or more, all kept (spread over
+# different dates). They get compliance 4. If any entry of the sitting is
+# dropped, the kept one keeps its usual code.
+.qa_binge <- function(person, dd, start, kept, hours) {
+  out <- rep(FALSE, length(person))
+  for (g in split(seq_along(person), paste(person, dd))) {
+    g <- g[order(start[g])]
+    if (length(g) < 2) next
+    gap <- c(Inf, as.numeric(difftime(start[g][-1], start[g][-length(g)], units = "hours")))
+    for (sit in split(g, cumsum(gap > hours)))
+      if (length(sit) >= 2 && all(kept[sit])) out[sit] <- TRUE
+  }
+  out
+}
+
 # "1212, 1172" / "1212,1172 " / "1062.0" -> "1212, 1172" / "1062"
 .qa_person <- function(x) {
   x <- trimws(as.character(x))
@@ -173,6 +189,7 @@
   x$tagged <- !is.na(x$rule)
   x$compliance <- .qa_compliance(x$start, x$cur, d$kind, s)
   x$compliance[x$rule %in% "R99"] <- NA_integer_
+  x$compliance[.qa_binge(x$person, x$diary_date, x$start, !is.na(x$cur) & !(x$rule %in% "R99"), s$binge_hours)] <- 4L
 
   # Row numbers in the proposals file: participants needing a decision first,
   # then by ID; within a participant, by start time.

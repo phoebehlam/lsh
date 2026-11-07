@@ -43,6 +43,13 @@ test_that("compliance follows the agreed cut-offs", {
   expect_true(is.na(.qa_compliance(m[1], as.Date(NA), "morning", s)))
 })
 
+test_that("binged entries all kept get compliance 4; a dropped one breaks the binge", {
+  t <- at(c("2026-10-04 22:28:00", "2026-10-04 22:34:00", "2026-10-04 22:37:00", "2026-10-05 12:00:00", "2026-10-05 23:00:00"))
+  dd <- as.Date(c("2026-10-04", "2026-10-04", "2026-10-04", "2026-10-05", "2026-10-05"))
+  expect_equal(.qa_binge(rep("1", 5), dd, t, rep(TRUE, 5), 2), c(TRUE, TRUE, TRUE, FALSE, FALSE))
+  expect_equal(.qa_binge(rep("1", 5), dd, t, c(TRUE, TRUE, FALSE, TRUE, TRUE), 2), rep(FALSE, 5))
+})
+
 test_that("shared caregiver IDs are tidied but kept together for review", {
   expect_equal(.qa_person(c("1212, 1172", "1212,1172 ", "1062.0", "", NA)),
                c("1212, 1172", "1212, 1172", "1062", NA, NA))
@@ -151,6 +158,14 @@ test_that("step 2 writes the log and clean data; week 2 only proposes new entrie
   expect_equal(r1$should_date, as.Date("2026-10-04"))
   expect_equal(r1$should_day, 1)
   expect_equal(as.numeric(r1$compliance), 3)
+  # compliance 4: 9092's 3 entries done in one sitting, all kept on 10/02-10/04
+  b <- cg[cg$id %in% "9092" & format(cg$startdate, tz = "UTC") %in% c("2026-10-04 22:28:51", "2026-10-04 22:34:23", "2026-10-04 22:37:52"), ]
+  expect_equal(as.numeric(b$compliance), c(4, 4, 4))
+  expect_equal(as.character(b$should_date), c("2026-10-02", "2026-10-03", "2026-10-04"))
+  # not a binge: one of the sitting dropped (9012 08:20 kept, 08:44 dropped), or hours apart (9032)
+  expect_equal(as.numeric(cg$compliance[format(cg$startdate, tz = "UTC") == "2026-07-08 08:20:16"]), 2)
+  expect_false(any(cg$compliance[cg$id %in% "9032"] %in% 4))
+  expect_equal(sum(cg$compliance %in% 4), 3)
   ov <- cg[format(cg$startdate, tz = "UTC") == "2026-07-18 14:36:03", ]
   expect_equal(c(as.character(ov$should_date), ov$qa_source), c("2026-07-18", "override"))
   # dropped: 08:44:03, 17:36:46 (once per teen), 3 restarts, 20:00:00, 1 empty entry, and the row without an ID

@@ -22,6 +22,9 @@ on the date itself, keep the one closest to the participant's usual start time.}
 date; needs at least this many (3), otherwise R2 keeps the earliest.}
 \item{restart_minutes}{R0: an unfinished entry followed by another within this many minutes (30) is
 a restart and is dropped.}
+\item{binge_hours}{Compliance 4: entries for the same date each started within this many hours (2)
+of the previous one count as one sitting. When 2+ entries of a sitting are all kept (spread over
+different nights/days), they all get compliance 4.}
 \item{r3_from, r3_until}{R3: a single night entry started between these hours (12 to 19, i.e. before
 the night diary link usually goes out) moves back one night when that night is empty.}
 \item{morning_cutoff}{Morning diaries started before this hour count for the previous day (4).}

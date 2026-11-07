@@ -48,6 +48,9 @@ new tagged entries that aren't in the proposals file (then run step 1 again).
   diaries started before 04:00 count for the previous day.
 - **Compliance.** Night: 1 = on time (by 04:00 next day), 2 = 04:00–11:59 next day,
   3 = 12:00 next day or later. Morning: 1 = before 14:00, 2 = 14:00–23:59, 3 = next day or later.
+  Both: 4 = binged – entries for the same date done in one sitting (each started within 2 hours
+  of the previous one) and all kept, spread over different nights/days. If any entry of the
+  sitting is dropped, the kept one gets its usual code.
 - **R0** an entry with no answers, or an unfinished entry restarted within 30 minutes → drop it.
   Other unfinished entries count like any entry (partial answers are kept).
 - **R1** 2+ entries on a date and 1–3 empty nights/days right before it → the earliest entries

@@ -213,6 +213,8 @@
   out$diary_date <- d$x$diary_date
   out$should_date <- should
   out$compliance <- .qa_compliance(raw$startdate, should, d$kind, s)
+  b <- .qa_binge(r$x$person, r$x$diary_date, r$x$start, !is.na(r$x$cur), s$binge_hours)
+  out$compliance[k[b]] <- 4L
   out$exclude <- excl
   out$qa_rule <- qa_rule
   out$qa_action <- qa_action
@@ -229,9 +231,9 @@
   out <- out[order(out$id, out$should_date, out$startdate), c(setdiff(names(out), front), front)]
   attr(out$exclude, "label") <- "1 = dropped in diary QA (or no ID); leave out of analyses"
   attr(out$compliance, "label") <- if (d$kind == "night")
-    sprintf("1 = on time (by %02d:00 next day), 2 = before %02d:00 next day, 3 = %02d:00 next day or later",
+    sprintf("1 = on time (by %02d:00 next day), 2 = before %02d:00 next day, 3 = %02d:00 next day or later, 4 = binged (done in one sitting with other entries, all kept)",
             s$night_ontime_until, s$night_cutoff, s$night_cutoff)
-  else sprintf("1 = before %02d:00, 2 = %02d:00 or later that day, 3 = next day or later",
+  else sprintf("1 = before %02d:00, 2 = %02d:00 or later that day, 3 = next day or later, 4 = binged (done in one sitting with other entries, all kept)",
                s$morning_ontime_until, s$morning_ontime_until)
   out
 }

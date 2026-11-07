@@ -62,6 +62,9 @@ for the previous night. Compliance 1 = on time (by 04:00 the next day),
 2 = 04:00-11:59 the next day, 3 = 12:00 the next day or later.
 \item Morning diary: started before 04:00 counts for the previous day.
 Compliance 1 = before 14:00, 2 = 14:00-23:59, 3 = the next day or later.
+\item Both: compliance 4 = binged. Entries for the same date done in one sitting (each started
+within 2 hours of the previous one) and all kept, spread over different nights/days. If any
+entry of the sitting is dropped, the kept one gets its usual code.
 }
 Tagging rules, per participant and night/day:
 \itemize{

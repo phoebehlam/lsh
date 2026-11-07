@@ -20,6 +20,9 @@
 #'     date; needs at least this many (3), otherwise R2 keeps the earliest.}
 #'   \item{restart_minutes}{R0: an unfinished entry followed by another within this many minutes (30) is
 #'     a restart and is dropped.}
+#'   \item{binge_hours}{Compliance 4: entries for the same date each started within this many hours (2)
+#'     of the previous one count as one sitting. When 2+ entries of a sitting are all kept (spread over
+#'     different nights/days), they all get compliance 4.}
 #'   \item{r3_from, r3_until}{R3: a single night entry started between these hours (12 to 19, i.e. before
 #'     the night diary link usually goes out) moves back one night when that night is empty.}
 #'   \item{morning_cutoff}{Morning diaries started before this hour count for the previous day (4).}
@@ -39,6 +42,7 @@ rth_diary_qa_settings <- function() {
     r2_evening_from = 16,
     typical_min_n = 3,
     restart_minutes = 30,
+    binge_hours = 2,
     r3_from = 12,
     r3_until = 19,
     morning_cutoff = 4,
@@ -79,6 +83,9 @@ rth_diary_qa_settings <- function() {
 #'     2 = 04:00-11:59 the next day, 3 = 12:00 the next day or later.
 #'   \item Morning diary: started before 04:00 counts for the previous day.
 #'     Compliance 1 = before 14:00, 2 = 14:00-23:59, 3 = the next day or later.
+#'   \item Both: compliance 4 = binged. Entries for the same date done in one sitting (each started
+#'     within 2 hours of the previous one) and all kept, spread over different nights/days. If any
+#'     entry of the sitting is dropped, the kept one gets its usual code.
 #' }
 #' Tagging rules, per participant and night/day:
 #' \itemize{

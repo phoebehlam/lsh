@@ -167,7 +167,10 @@
                                          s$r3_from, s$r3_until), "move it back one night"), wrap = 3:4),
     .qa_tr(c("R99", "all", "none of the above fits, or something looks off (e.g. an entry that took 0 seconds, or a clash with an earlier week's decision)",
              "needs a decision"), wrap = 3:4)))
-  paste0('<h1 id="rules">rules</h1><h3>dates and compliance</h3>', dates, "<h3>tagging</h3>", tags,
+  paste0('<h1 id="rules">rules</h1><h3>dates and compliance</h3>', dates,
+         sprintf('<p class="note">compliance 4 (binged), all diaries: entries for the same date done in one sitting (each started within %s hours of the previous one) and all kept, spread over different nights or days. if any entry of the sitting is dropped, the kept one gets its usual code.</p>',
+                 format(s$binge_hours)),
+         "<h3>tagging</h3>", tags,
          '<p class="note">decisions in the decisions log are applied first and never proposed again. ',
          'compliance is worked out from the start time and should_date.</p>')
 }
