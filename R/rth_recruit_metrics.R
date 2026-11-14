@@ -187,8 +187,7 @@ tracker_checks <- function(scr, tr, fam, steps, report_date, wait_days = 14, dia
   add("Consent, interview or caregiver survey date is in the future", fid(fam$family[fut]),
       "Usually a typo (future lab visit dates are fine).")
   later <- !is.na(fam$interview) | !is.na(fam$cg_survey) | !is.na(fam$lab_sched) | !is.na(fam$lab_date)
-  add("Interview, survey or lab visit date but no consent date", fid(fam$family[later & is.na(fam$consent)]),
-      "The report counts them as consented anyway; please fill in the consent date.")
+  add("Interview, survey or lab visit date but no consent date", fid(fam$family[later & is.na(fam$consent)]))
   add("Interview date is before the consent date",
       fid(fam$family[!is.na(fam$consent) & !is.na(fam$interview) & fam$interview < fam$consent]))
   if (isTRUE(has[["lab_sched_date"]]) && any(!is.na(fam$lab_sched))) {
@@ -203,8 +202,7 @@ tracker_checks <- function(scr, tr, fam, steps, report_date, wait_days = 14, dia
     # N/A typed in on purpose (e.g. dropped out) is fine; a blank is not
     blank <- vapply(cols, function(v) is.na(teen[[v]]) & !(teen[[paste0(v, "_na")]] %in% TRUE), logical(nrow(teen)))
     miss <- teen$rth_id[rowSums(matrix(blank, nrow = nrow(teen))) > 0]
-    add(sprintf("Lab visit %d+ days ago, daily assessment counts not filled in", diary_days), miss,
-        "Type the number of days, or N/A if it doesn't apply (e.g. the family dropped out).")
+    add(sprintf("Lab visit %d+ days ago, daily assessment counts not filled in", diary_days), miss)
   }
   chk
 }

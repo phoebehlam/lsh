@@ -209,8 +209,7 @@ plot_completion <- function(ct) {
     if (c$n == 0) return(sprintf('<li class="ok"><span class="mark">&#10003;</span>%s: none</li>', c$label))
     ids <- if (length(c$ids) > 0) sprintf('<details><summary>Show %d</summary><p class="ids">%s</p></details>', c$n,
                                           paste(.esc(c$ids), collapse = ", ")) else ""
-    sprintf('<li class="flag"><span class="mark">!</span><strong>%s: %d</strong>%s%s</li>', c$label, c$n,
-            if (nzchar(c$help)) sprintf(' <span class="note">%s</span>', c$help) else "", ids)
+    sprintf('<li class="flag"><span class="mark">!</span><strong>%s: %d</strong>%s</li>', c$label, c$n, ids)
   }, "")
   sprintf('<ul class="checks">%s</ul>', paste(items, collapse = ""))
 }

@@ -63,3 +63,5 @@ td.what{text-align:left;white-space:normal;min-width:220px;color:var(--muted)}
 .recrow .what{color:var(--muted);font-size:.8rem}
 .wkwrap{max-width:1000px;margin-top:6px}.wkwrap .wkbar{margin-top:2px}
 .recspan{font-size:.74rem;font-weight:600;color:#0072B2;border:2px solid #0072B2;border-bottom:0;height:16px;line-height:12px;padding:0 4px;white-space:nowrap;overflow:visible}
+p.plain{color:var(--ink);font-size:.86rem;margin:6px 0}
+.recrow .what{color:var(--ink)}

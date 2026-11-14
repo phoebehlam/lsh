@@ -125,8 +125,18 @@ read_tracker <- function(tracker, sheet = "tracking") {
   if (must_have_tab && !sheet %in% shs)
     stop(sprintf("No '%s' tab in %s (tabs: %s).", sheet, basename(tracker), paste(shs, collapse = ", ")), call. = FALSE)
   # na.strings = "": keep a typed "NA" as text (it means N/A for the daily counts)
-  openxlsx::read.xlsx(tracker, sheet = if (sheet %in% shs) sheet else 1, detectDates = FALSE, na.strings = "",
-                      check.names = FALSE, sep.names = " ", skipEmptyRows = FALSE)
+  d <- openxlsx::read.xlsx(tracker, sheet = if (sheet %in% shs) sheet else 1, detectDates = FALSE, na.strings = "",
+                           check.names = FALSE, sep.names = " ", skipEmptyRows = FALSE)
+  # openxlsx can hand back "&" as "&amp;" (and < > as &lt; &gt;), in headers and text cells
+  names(d) <- .unescape_xml(names(d))
+  d[] <- lapply(d, function(v) if (is.character(v)) .unescape_xml(v) else v)
+  d
+}
+
+.unescape_xml <- function(x) {
+  x <- gsub("&lt;", "<", x, fixed = TRUE); x <- gsub("&gt;", ">", x, fixed = TRUE)
+  x <- gsub("&quot;", "\"", x, fixed = TRUE); x <- gsub("&apos;", "'", x, fixed = TRUE)
+  gsub("&amp;", "&", x, fixed = TRUE)
 }
 
 #' One row per family: screener ID and the dates of each step

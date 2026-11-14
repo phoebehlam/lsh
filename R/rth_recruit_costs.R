@@ -222,17 +222,10 @@ cost_html <- function(cs, week, wl, lmh = NULL, study_start, week_hours = 37.5) 
   free <- if (length(f$free)) sprintf('<p class="note">Sources with screeners but no costs logged (not in the table): %s.</p>',
                                       paste(.esc(f$free), collapse = ", ")) else ""
 
-  paste0('<ul class="facts">', paste0("<li>", facts, "</li>", collapse = ""), '</ul>',
-         '<h3 id="cost-checks">Costs sheet checks</h3>', .checks_html(chk),
+  paste0('<h3 id="cost-checks">Costs sheet checks</h3>', .checks_html(chk),
          '<h3 id="cost-util">Cost per step, by source (all time)</h3>',
-         '<p class="note">Total cost = ads, materials and treats + staff time spent on recruitment (hover for the split). ',
-         'Each cell: cost per family reaching that step, then the number of families in small grey. A family that picked 2 sources counts as half for each, ',
-         'so counts can have decimals. General costs are only in All strategies, which is divided by every completed screener. ',
-         sprintf('<span class="best-key">Green</span> = cheapest; <span class="thin-key">grey</span> = fewer than %d families, too few to compare. ', .thin_n),
-         'Later steps lag: recent screeners haven&rsquo;t had time to reach a lab visit yet.</p>',
          util, free,
          '<h3 id="cost-weeks">By week</h3>', weeks_tab,
-         '<p class="note">Costs are counted in the week of the date in the sheet. &ldquo;$ per completed screener that week&rdquo; is only a rough guide, since ads and flyers keep bringing in screeners after the week they were paid for.</p>',
          sprintf('<h3 id="cost-hours">Lab manager&rsquo;s recruitment hours this week (Week %d: %s)</h3>', week, wl(week)),
          lm_rec_html(cs, week),
          sprintf('<h3 id="lm-week">Lab manager&rsquo;s week (Week %d: %s)</h3>', week, wl(week)),
@@ -318,19 +311,18 @@ lm_week_html <- function(cs, lmh, week, study_start, week_hours = 37.5) {
                   segs$col, .esc(segs$label), lab(segs$hours)), collapse = ""),
     if (gap > 0) sprintf('<span class="chip"><i class="empty"></i>Not logged: <b>%s</b></span>', lab(gap)) else "")
   rec_tot <- sum(segs$hours[segs$rec])
-  head <- sprintf('<p class="note">Out of a %s-hour week. Recruitment: <b>%s</b>. Logged in all: %s%s.</p>',
-                  .hrs(week_hours), lab(rec_tot), lab(logged),
-                  if (logged > week_hours) sprintf(" (%s h over; the line marks %s h)", .hrs(logged - week_hours), .hrs(week_hours)) else "")
+  head <- sprintf('<p class="plain">%.0f%% of the %s-hour week spent on recruitment</p>', 100 * rec_tot / week_hours, .hrs(week_hours))
   nts <- attr(lmh, "notes")
   nts <- if (!is.null(nts)) nts[rth_study_week(nts$date, study_start) %in% week, , drop = FALSE] else NULL
-  notes <- if (!is.null(nts) && nrow(nts)) sprintf('<details><summary>His notes this week (%d)</summary><ul class="wi">%s</ul></details>',
+  notes <- if (!is.null(nts) && nrow(nts)) sprintf('<details><summary>This week&rsquo;s notes (%d)</summary><ul class="wi">%s</ul></details>',
     nrow(nts), paste(sprintf("<li>%s: %s</li>", format(nts$date, "%a %m/%d"), .esc(nts$note)), collapse = "")) else ""
   missing_tab <- if (is.null(lmh)) '<p class="note">No &ldquo;lab manager hours&rdquo; tab found in the costs sheet, so only recruitment is shown.</p>' else ""
-  bracket <- if (rec_tot > 0) sprintf('<div class="recspan" style="width:%.3f%%">Recruitment %s</div>', 100 * rec_tot / scale, lab(rec_tot)) else ""
-  paste0(missing_tab, head, '<div class="wkwrap">', bracket, '<div class="wkbar">', bar, '</div></div>', '<div class="chips">', chips, '</div>', notes)
+  paste0(missing_tab, head, '<div class="wkwrap"><div class="wkbar">', bar, '</div></div>', '<div class="chips">', chips, '</div>', notes)
 }
 
 # Lab manager's recruitment hours this week, by source (in person / remote)
+# In person blue; remote orange (the same orange as participant tracking in the week bar below)
+.rec_src_cols <- c("Recruitment, in person" = "#0072B2", "Recruitment, remote" = "#E69F00", "Recruitment, not marked" = "#9CC3E0")
 lm_rec_html <- function(cs, week) {
   rec <- cs$all[cs$all$type == "Time" & cs$all$person %in% "Lab manager" & cs$all$week %in% week, , drop = FALSE]
   if (!nrow(rec)) return('<p class="note">No recruitment time logged for the lab manager this week.</p>')
@@ -341,13 +333,13 @@ lm_rec_html <- function(cs, week) {
     x <- rec[src == s, , drop = FALSE]
     h <- c(sum(x$hours[x$mode %in% "In person"], na.rm = TRUE), sum(x$hours[x$mode %in% "Remote"], na.rm = TRUE),
            sum(x$hours[is.na(x$mode)], na.rm = TRUE))
-    segs <- paste(sprintf('<div style="width:%.3f%%;background:%s" title="%s: %s h"></div>', 100 * h / mx, .rec_cols, names(.rec_cols), .hrs(h))[h > 0], collapse = "")
+    segs <- paste(sprintf('<div style="width:%.3f%%;background:%s" title="%s: %s h"></div>', 100 * h / mx, .rec_src_cols, names(.rec_src_cols), .hrs(h))[h > 0], collapse = "")
     sprintf('<div class="recrow"><span>%s</span><div class="stack">%s</div><span class="n">%s h</span><span class="what">%s</span></div>',
             .esc(s), segs, .hrs(sum(h)), .esc(paste(unique(stats::na.omit(x$what)), collapse = "; ")))
   }, "")
   used <- c(any(rec$mode %in% "In person"), any(rec$mode %in% "Remote"), any(is.na(rec$mode)))
-  key <- paste(sprintf('<span class="chip"><i style="background:%s"></i>%s</span>', .rec_cols, sub("Recruitment, ", "", names(.rec_cols)))[used], collapse = "")
-  paste0(sprintf('<p class="note">Total: %s h (%s h in person, %s h remote).</p>', .hrs(sum(rec$hours, na.rm = TRUE)),
+  key <- paste(sprintf('<span class="chip"><i style="background:%s"></i>%s</span>', .rec_src_cols, sub("Recruitment, ", "", names(.rec_src_cols)))[used], collapse = "")
+  paste0(sprintf('<p class="plain">Total: %s h (%s h in person, %s h remote).</p>', .hrs(sum(rec$hours, na.rm = TRUE)),
                  .hrs(sum(rec$hours[rec$mode %in% "In person"], na.rm = TRUE)), .hrs(sum(rec$hours[rec$mode %in% "Remote"], na.rm = TRUE))),
          '<div class="chips">', key, '</div>', paste(rows, collapse = ""))
 }

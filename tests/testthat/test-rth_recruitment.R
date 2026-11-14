@@ -240,7 +240,8 @@ test_that("lab manager's week: 37.5-hour bar, recruitment from the costs tab, un
   rec <- sum(cst$hours[cst$type == "Time" & cst$person %in% "Lab manager" & rth_study_week(cst$date, ss) %in% 27])
   other <- sum(lmh$hours[rth_study_week(lmh$date, ss) %in% 27])
   h <- lm_week_html(cs, lmh, 27, ss)
-  expect_match(h, sprintf("Recruitment: <b>%s h &middot; %.0f%%", .hrs(rec), 100 * rec / 37.5))
+  expect_match(h, sprintf('<p class="plain">%.0f%% of the 37.5-hour week spent on recruitment</p>', 100 * rec / 37.5), fixed = TRUE)
+  expect_false(grepl("recspan|<b>Recruitment|His notes", h))
   gap <- 37.5 - rec - other
   expect_match(h, sprintf('class="seg empty" style="width:%.3f%%"', 100 * gap / 37.5))
   expect_match(h, sprintf("Not logged: <b>%s h &middot; %.0f%%", .hrs(gap), 100 * gap / 37.5))
@@ -248,7 +249,7 @@ test_that("lab manager's week: 37.5-hour bar, recruitment from the costs tab, un
   # over 37.5: no white part, a line at 37.5
   big <- lmh; big$hours <- big$hours * 3
   h2 <- lm_week_html(cs, big, 27, ss)
-  expect_false(grepl("seg empty", h2)); expect_match(h2, "mark375"); expect_match(h2, "h over")
+  expect_false(grepl("seg empty", h2)); expect_match(h2, "mark375")
   # no hours tab: recruitment only, with a note
   expect_match(lm_week_html(cs, NULL, 27, ss), "No &ldquo;lab manager hours&rdquo; tab")
   expect_null(read_lm_hours(rec_ex("sim_tracking.xlsx")))
@@ -478,4 +479,33 @@ test_that("daily counts: a typed N/A (e.g. dropped out) is fine, a blank is stil
   # a downloaded .xlsx keeps a typed "NA" as N/A (not a blank)
   f <- tempfile(fileext = ".xlsx"); openxlsx::write.xlsx(list(tracking = df), f)
   expect_equal(read_tracker(f)$n_night_na, c(TRUE, TRUE, FALSE, FALSE, TRUE))
+})
+
+test_that("flagged checks show no grey help text; cost section has no bullets or long notes", {
+  chk <- list(list(label = "Something to fix", n = 2L, ids = c("1231", "1241"), help = "Long explanation here."))
+  h <- .checks_html(chk)
+  expect_false(grepl("Long explanation|class=\"note\"", h))
+  expect_match(h, "<strong>Something to fix: 2</strong>")
+  d <- file.path(tempdir(), "rec_tidy"); unlink(d, recursive = TRUE)
+  p <- suppressMessages(render_rth_recruitment(rec_ex("sim_prescreen.sav"), rec_ex("sim_tracking.xlsx"), out_dir = d,
+                                               report_date = rd, costs = TRUE, costs_sheet = rec_ex("sim_costs.xlsx")))
+  x <- paste(readLines(p, warn = FALSE), collapse = " ")
+  cost <- sub('.*<h2 id="costs">', "", x)
+  expect_false(grepl('<ul class="facts">|Total cost = |Costs are counted in the week', cost))
+  expect_false(grepl("The report counts them as consented anyway|Type the number of days", x))
+  expect_match(cost, '<p class="plain">Total: [0-9.]+ h \\(')
+  expect_match(cost, "background:#E69F00\" title=\"Recruitment, remote")                # remote = orange
+  expect_match(cost, "This week&rsquo;s notes")
+})
+
+test_that("'&' in a downloaded .xlsx comes through as '&', not '&amp;'", {
+  f <- tempfile(fileext = ".xlsx")
+  d <- data.frame(date = "11/9/2026", `lab visits (dry & wet)` = "2", notes = "tabling & flyers <2h>", check.names = FALSE)
+  openxlsx::write.xlsx(list(`lab manager hours` = d), f)
+  x <- .tracker_raw(f, "lab manager hours", must_have_tab = TRUE)
+  x$notes <- .unescape_xml(.unescape_xml(x$notes))                       # idempotent on already-clean text
+  expect_equal(names(x)[2], "lab visits (dry & wet)")
+  expect_equal(.unescape_xml("a &amp; b &lt;c&gt;"), "a & b <c>")
+  h <- read_lm_hours(f)
+  expect_equal(levels(h$category), "lab visits (dry & wet)")
 })
