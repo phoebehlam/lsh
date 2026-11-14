@@ -11,7 +11,7 @@ render_rth_recruitment(
   out_dir = ".",
   week = NULL,
   report_date = Sys.Date(),
-  study_start = as.Date("2026-04-25"),
+  study_start = as.Date("2026-04-24"),
   seed_sheet = NULL,
   tracker_tab = "tracking",
   costs = FALSE,
@@ -35,12 +35,14 @@ household income and caregiver education of enrolled families.}
 
 \item{out_dir}{Folder for the report.}
 
-\item{week}{Study week to report on. Default: the last full week (Saturday
-to Friday) before \code{report_date}.}
+\item{week}{Study week to report on. Default: the last full week (Friday
+to Thursday) before \code{report_date}, so a report run on a Friday
+covers the week that ended the day before.}
 
 \item{report_date}{Date of the run (default today).}
 
-\item{study_start}{First day of week 1 (a Saturday).}
+\item{study_start}{First day of week 1 (a Friday; weeks run Friday to
+Thursday).}
 
 \item{seed_sheet}{Optional: the old weekly counts sheet (.tsv/.csv/.xlsx),
 for lab visits scheduled in weeks before the tracker logged booking dates.}

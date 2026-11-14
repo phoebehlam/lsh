@@ -40,7 +40,7 @@
   df[as.numeric(df$Status) %in% .rth_keep_status, , drop = FALSE]
 }
 
-# Study weeks run Saturday-Friday; week 1 starts on study_start (Apr 25, 2026).
+# Study weeks run Friday-Thursday; week 1 starts on study_start (Fri Apr 24, 2026).
 rth_study_week <- function(date, study_start) {
   as.integer(floor(as.numeric(as.Date(date) - as.Date(study_start)) / 7) + 1)
 }

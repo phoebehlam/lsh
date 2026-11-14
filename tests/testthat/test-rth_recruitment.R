@@ -3,11 +3,16 @@
 rec_ex <- function(f) file.path(.rth_recruit_home(), "example_data", f)
 rd <- as.Date("2026-10-31")
 
-test_that("study weeks run Saturday-Friday from Apr 25, 2026", {
-  st <- as.Date("2026-04-25")
-  expect_equal(rth_study_week(as.Date(c("2026-04-25", "2026-05-01", "2026-05-02", "2026-10-24", "2026-10-30", "2026-10-31")), st),
+test_that("study weeks run Friday-Thursday from Fri Apr 24, 2026", {
+  st <- as.Date("2026-04-24")
+  expect_equal(rth_study_week(as.Date(c("2026-04-24", "2026-04-30", "2026-05-01", "2026-10-23", "2026-10-29", "2026-10-30")), st),
                c(1L, 1L, 2L, 27L, 27L, 28L))
-  expect_equal(.week_label(27, st), "10/24&ndash;10/30")
+  expect_equal(.week_label(27, st), "10/23&ndash;10/29")
+  expect_equal(formals(render_rth_recruitment)$study_start, quote(as.Date("2026-04-24")))
+  expect_equal(format(as.Date("2026-04-24"), "%u"), "5")                 # a Friday
+  # run on a Friday: the report covers the week that ended the day before (Fri-Thu)
+  fri <- as.Date("2026-11-13")
+  expect_equal(.week_label(rth_study_week(fri, st) - 1L, st), "11/6&ndash;11/12")
 })
 
 test_that("screener outcomes follow eligi_status, answers matched by label", {
@@ -135,9 +140,10 @@ test_that("full report renders, without contact info; handles an empty screener 
   p <- suppressMessages(render_rth_recruitment(rec_ex("sim_prescreen.sav"), rec_ex("sim_tracking.xlsx"),
                                                rec_ex("sim_cg_interview.sav"), out_dir = d, report_date = rd,
                                                seed_sheet = rec_ex("sim_weekly_sheet.txt")))
-  expect_equal(basename(p), "RTH_recruitment_week27_2026-10-30.html")
+  expect_equal(basename(p), "RTH_recruitment_week27_2026-10-29.html")
   h <- paste(readLines(p, warn = FALSE), collapse = " ")
-  expect_match(h, "This week \\(Week 27: 10/24&ndash;10/30\\)")
+  expect_match(h, "This week \\(Week 27: 10/23&ndash;10/29\\)")
+  expect_match(h, "weeks run Friday&ndash;Thursday")
   expect_false(grepl("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", h))   # no email addresses
   for (id in c("checks", "t-weekly", "conv-week", "conv-src", "t-src", "demo-scr", "demo-enr", "daily"))
     expect_match(h, sprintf('id="%s"', id))
@@ -442,4 +448,28 @@ test_that("eligible screeners closed as in-progress are listed first in the trac
   expect_true(all(grepl("\\(started [0-9]{2}/[0-9]{2}/2026\\)", ck[[1]]$ids)))
   old <- ck[[which(vapply(ck, `[[`, "", "label") == "Eligible screeners from 2 to 8 weeks ago with no family in the tracker")]]
   expect_false(any(vapply(as.character(raw$screenerid[j]), function(i) any(grepl(i, old$ids)), TRUE)))   # not listed twice
+})
+
+test_that("daily counts: a typed N/A (e.g. dropped out) is fine, a blank is still flagged", {
+  df <- data.frame(`RTH ID` = c("9011", "9012", "9021", "9031", "9041"),
+                   `adolescent or caregiver?` = c("adolescent", "caregiver", "adolescent", "adolescent", "adolescent"),
+                   `lab visit date` = "9/1/2026",
+                   `night diaries completed` = c("N/A", "N/A", "14", "", "NA"),
+                   `morning diaries completed` = c("n/a", "", "13", "12", "na"),
+                   `food photos completed` = c("N/A", "", "", "10", "N/A"),
+                   `watch nights worn` = c("N/A", "", "15", "15", "dropped"), check.names = FALSE)
+  tr <- read_tracker(df)
+  expect_equal(tr$n_night_na, c(TRUE, TRUE, FALSE, FALSE, TRUE))
+  fam <- tracker_families(tr, rd)
+  s <- read_screener(rec_ex("sim_prescreen.sav"))
+  ck <- tracker_checks(s, tr, fam, link_steps(s, fam), rd)
+  miss <- ck[[which(vapply(ck, `[[`, "", "label") == "Lab visit 21+ days ago, daily assessment counts not filled in")]]
+  # 9011: all N/A -> fine; 9021: food blank; 9031: night blank; 9041: "dropped" isn't N/A or a number
+  expect_equal(sort(miss$ids), c("9021", "9031", "9041"))
+  ct <- completion_table(tr, rd)
+  expect_equal(ct$any_na, c(TRUE, FALSE, FALSE, TRUE))
+  expect_true(all(is.na(ct$night[ct$rth_id == "9011"])))                # N/A left out of the summaries
+  # a downloaded .xlsx keeps a typed "NA" as N/A (not a blank)
+  f <- tempfile(fileext = ".xlsx"); openxlsx::write.xlsx(list(tracking = df), f)
+  expect_equal(read_tracker(f)$n_night_na, c(TRUE, TRUE, FALSE, FALSE, TRUE))
 })

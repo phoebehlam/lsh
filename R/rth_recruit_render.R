@@ -13,10 +13,12 @@
 #' @param interview_sav Optional caregiver SES interview export (.sav), for
 #'   household income and caregiver education of enrolled families.
 #' @param out_dir Folder for the report.
-#' @param week Study week to report on. Default: the last full week (Saturday
-#'   to Friday) before \code{report_date}.
+#' @param week Study week to report on. Default: the last full week (Friday
+#'   to Thursday) before \code{report_date}, so a report run on a Friday
+#'   covers the week that ended the day before.
 #' @param report_date Date of the run (default today).
-#' @param study_start First day of week 1 (a Saturday).
+#' @param study_start First day of week 1 (a Friday; weeks run Friday to
+#'   Thursday).
 #' @param seed_sheet Optional: the old weekly counts sheet (.tsv/.csv/.xlsx),
 #'   for lab visits scheduled in weeks before the tracker logged booking dates.
 #' @param tracker_tab Tab of the tracking sheet to read.
@@ -45,7 +47,7 @@
 #' @export
 render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, out_dir = ".",
                                    week = NULL, report_date = Sys.Date(),
-                                   study_start = as.Date("2026-04-25"), seed_sheet = NULL,
+                                   study_start = as.Date("2026-04-24"), seed_sheet = NULL,
                                    tracker_tab = "tracking", costs = FALSE, costs_sheet = NULL, costs_tab = "costs",
                                    hourly_rates = c("Lab manager" = 21.50 * 1.256, "Grad student" = 30000 / 520),
                                    lm_hours_tab = "lab manager hours", lm_week_hours = 37.5,
@@ -340,7 +342,9 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
     li <- paste0(summ(ct$night, "Teen night diaries"), summ(ct$morning, "Teen morning diaries"),
                  summ(ct$food, "Food photos"), summ(ct$watch, "Watch nights worn"), summ(ct$cg_night, "Caregiver night diaries"))
     p <- plot_completion(ct)
-    paste0(sprintf('<p class="note">Teens who did the lab visit: %d. Out of 15 days.</p><ul class="facts">%s</ul>', nrow(ct), li),
+    paste0(sprintf('<p class="note">Teens who did the lab visit: %d. Out of 15 days.%s</p><ul class="facts">%s</ul>', nrow(ct),
+                   if (any(ct$any_na)) sprintf(" %d marked N/A for at least one count (e.g. dropped out); N/A counts are left out below.", sum(ct$any_na)) else "",
+                   li),
            if (is.null(p)) "" else img_tag(p, height = 3.4, width = 9, alt = "Daily assessment completion"))
   }
 
@@ -370,7 +374,7 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
   paste0('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
     sprintf('<title>RTH recruitment, week %d</title><style>%s</style></head><body>', week, css), nav, '<main>',
     '<h1>Rise to Health recruitment report</h1>',
-    sprintf('<p class="meta">Report run %s &middot; latest screener %s &middot; tracking sheet: %d people in %d families &middot; weeks run Saturday&ndash;Friday</p>',
+    sprintf('<p class="meta">Report run %s &middot; latest screener %s &middot; tracking sheet: %d people in %d families &middot; weeks run Friday&ndash;Thursday</p>',
             .long_date(report_date), if (any(!is.na(scr$date))) .long_date(max(scr$date, na.rm = TRUE)) else "none",
             sum(!is.na(tr$rth_id)), nrow(fam)),
     '<h2 id="checks">Tracker checks</h2>', checks,

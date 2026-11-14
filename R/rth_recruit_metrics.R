@@ -200,8 +200,11 @@ tracker_checks <- function(scr, tr, fam, steps, report_date, wait_days = 14, dia
   teen <- tr[tr$role %in% "teen" & !is.na(tr$lab_date) & tr$lab_date <= report_date - diary_days, , drop = FALSE]
   cols <- intersect(c("n_night", "n_morning", "n_food", "n_watch"), names(tr))
   if (any(unlist(has[c("n_night", "n_morning", "n_food", "n_watch")]))) {
-    miss <- teen$rth_id[rowSums(is.na(as.matrix(teen[, cols, drop = FALSE]))) > 0]
-    add(sprintf("Lab visit %d+ days ago, daily assessment counts not filled in", diary_days), miss)
+    # N/A typed in on purpose (e.g. dropped out) is fine; a blank is not
+    blank <- vapply(cols, function(v) is.na(teen[[v]]) & !(teen[[paste0(v, "_na")]] %in% TRUE), logical(nrow(teen)))
+    miss <- teen$rth_id[rowSums(matrix(blank, nrow = nrow(teen))) > 0]
+    add(sprintf("Lab visit %d+ days ago, daily assessment counts not filled in", diary_days), miss,
+        "Type the number of days, or N/A if it doesn't apply (e.g. the family dropped out).")
   }
   chk
 }
@@ -213,9 +216,12 @@ tracker_checks <- function(scr, tr, fam, steps, report_date, wait_days = 14, dia
 completion_table <- function(tr, report_date) {
   teen <- tr[tr$role %in% "teen" & !is.na(tr$lab_date) & tr$lab_date <= report_date, , drop = FALSE]
   cg <- tr[tr$role %in% "caregiver", , drop = FALSE]
+  na_cols <- intersect(paste0(c("n_night", "n_morning", "n_food", "n_watch"), "_na"), names(teen))
   tibble::tibble(rth_id = teen$rth_id, lab_date = teen$lab_date,
                  night = teen$n_night, morning = teen$n_morning, food = teen$n_food, watch = teen$n_watch,
-                 cg_night = cg$n_night[match(teen$family, cg$family)])
+                 cg_night = cg$n_night[match(teen$family, cg$family)],
+                 # any count marked N/A (e.g. dropped out); N/A counts are left out of the summaries
+                 any_na = if (length(na_cols)) rowSums(as.matrix(teen[, na_cols, drop = FALSE])) > 0 else rep(FALSE, nrow(teen)))
 }
 
 # Outcomes, reasons, sources, demographics ---------------------------------------------

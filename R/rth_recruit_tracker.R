@@ -66,12 +66,20 @@ read_tracker <- function(tracker, sheet = "tracking") {
 
   num <- function(nm) suppressWarnings(as.numeric(get(nm)))
   out$age_lab <- num("age_lab")
-  for (nm in c("n_night", "n_morning", "n_food", "n_watch")) out[[nm]] <- num(nm)
+  # Daily assessment counts: a number, or N/A typed in on purpose (e.g. the
+  # family dropped out). N/A is kept apart from a blank cell, which still
+  # counts as not filled in.
+  for (nm in c("n_night", "n_morning", "n_food", "n_watch")) {
+    out[[nm]] <- num(nm)
+    out[[paste0(nm, "_na")]] <- .is_na_entry(get(nm))
+  }
   attr(out, "has") <- vapply(names(.tracker_cols), function(nm) !is.null(pick(nm)), logical(1))
   out
 }
 
 .is_blank <- function(v) is.na(v) | trimws(v) %in% c("", "-", "NA", "N/A", "n/a", "na")
+# An N/A typed into the cell (N/A, NA, n/a, na, not applicable), not a blank
+.is_na_entry <- function(v) !is.na(v) & tolower(gsub("[[:space:].]", "", v)) %in% c("n/a", "na", "notapplicable")
 
 # Dates written with slashes (10/24/2026 or 10/24/26). A bare number is an
 # Excel date (from a downloaded .xlsx), which is fine too.
@@ -116,7 +124,8 @@ read_tracker <- function(tracker, sheet = "tracking") {
   shs <- openxlsx::getSheetNames(tracker)
   if (must_have_tab && !sheet %in% shs)
     stop(sprintf("No '%s' tab in %s (tabs: %s).", sheet, basename(tracker), paste(shs, collapse = ", ")), call. = FALSE)
-  openxlsx::read.xlsx(tracker, sheet = if (sheet %in% shs) sheet else 1, detectDates = FALSE,
+  # na.strings = "": keep a typed "NA" as text (it means N/A for the daily counts)
+  openxlsx::read.xlsx(tracker, sheet = if (sheet %in% shs) sheet else 1, detectDates = FALSE, na.strings = "",
                       check.names = FALSE, sep.names = " ", skipEmptyRows = FALSE)
 }
 
