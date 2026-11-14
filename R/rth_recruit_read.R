@@ -56,15 +56,14 @@ rth_study_week <- function(date, study_start) {
 .long_date <- function(d) ifelse(is.na(d), NA_character_,
                                  paste0(format(d, "%b"), " ", as.integer(format(d, "%d")), ", ", format(d, "%Y")))
 
-#' Read the Rise to Health prescreen (screener) export
-#'
-#' One row per screener response, with the screening outcome, ineligible
-#' reasons, where they heard about the study, and demographics. Names, emails
-#' and phone numbers are not kept.
-#' @param path Path to the screener .sav.
-#' @param approved Screener IDs of families in the tracking sheet; they count as
-#'   eligible even if the screener said otherwise (e.g. approved after review).
-#' @keywords internal
+# Read the Rise to Health prescreen (screener) export
+#
+# One row per screener response, with the screening outcome, ineligible
+# reasons, where they heard about the study, and demographics. Names, emails
+# and phone numbers are not kept.
+# path: Path to the screener .sav.
+# approved: Screener IDs of families in the tracking sheet; they count as
+#   eligible even if the screener said otherwise (e.g. approved after review).
 .bot_cut <- 0.5
 
 read_screener <- function(path, approved = character(), bots = character()) {

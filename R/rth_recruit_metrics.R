@@ -1,11 +1,10 @@
 # Summaries for the weekly recruitment report ----------------------------------
 
-#' Read the weekly counts sheet used before this report (one row per week)
-#'
-#' Only "lab visits scheduled" is used, for weeks before the tracking sheet has
-#' a "lab visit scheduled date" column filled in. Accepts .csv, .txt/.tsv
-#' (tab) or .xlsx; the first column holds labels like "week 12 (7/12-7/18)".
-#' @keywords internal
+# Read the weekly counts sheet used before this report (one row per week)
+#
+# Only "lab visits scheduled" is used, for weeks before the tracking sheet has
+# a "lab visit scheduled date" column filled in. Accepts .csv, .txt/.tsv
+# (tab) or .xlsx; the first column holds labels like "week 12 (7/12-7/18)".
 read_seed_sheet <- function(path) {
   ext <- tolower(tools::file_ext(path))
   d <- if (ext == "xlsx") openxlsx::read.xlsx(path, check.names = FALSE) else
@@ -21,12 +20,11 @@ read_seed_sheet <- function(path) {
 
 # Weekly table --------------------------------------------------------------------
 
-#' Counts per study week
-#'
-#' Screeners and eligible count in the week of the screener (blocked IPs left
-#' out). Caregiver consent, interview, caregiver survey, lab visits scheduled
-#' (date booked) and lab visits done count in the week they happened.
-#' @keywords internal
+# Counts per study week
+#
+# Screeners and eligible count in the week of the screener (blocked IPs left
+# out). Caregiver consent, interview, caregiver survey, lab visits scheduled
+# (date booked) and lab visits done count in the week they happened.
 weekly_counts <- function(scr, fam, study_start, last_week, seed = NULL) {
   wk <- function(d) rth_study_week(d, study_start)
   s <- scr[!scr$screened_out, , drop = FALSE]
@@ -59,8 +57,7 @@ weekly_counts <- function(scr, fam, study_start, last_week, seed = NULL) {
 
 # Linking screeners to the tracker ----------------------------------------------------
 
-#' For each screener: which later steps the family reached (via screener ID)
-#' @keywords internal
+# For each screener: which later steps the family reached (via screener ID)
 link_steps <- function(scr, fam) {
   linked <- fam[!is.na(fam$screener_id), , drop = FALSE]
   # the typed ID can be the 6-digit screener ID or the Qualtrics Response ID
@@ -98,8 +95,7 @@ link_steps <- function(scr, fam) {
        lab = sum(sel & st$lab), pct_lab = pc(sum(sel & st$lab), sum(sel & st$sched)))
 }
 
-#' Conversion by source, all time
-#' @keywords internal
+# Conversion by source, all time
 source_conversion <- function(scr, steps) {
   keep <- !scr$screened_out
   src <- attr(scr, "sources")[keep, , drop = FALSE]
@@ -114,8 +110,7 @@ source_conversion <- function(scr, steps) {
   out
 }
 
-#' Conversion by week: families grouped by the week they did the screener
-#' @keywords internal
+# Conversion by week: families grouped by the week they did the screener
 weekly_conversion <- function(scr, steps, study_start, weeks) {
   keep <- !scr$screened_out
   s <- scr[keep, , drop = FALSE]; st <- steps[keep, , drop = FALSE]
@@ -125,11 +120,10 @@ weekly_conversion <- function(scr, steps, study_start, weeks) {
 
 # Tracker checks ------------------------------------------------------------------------
 
-#' Things to follow up on in the tracking sheet
-#'
-#' Each check returns a short label, a count, and the IDs involved (RTH IDs or
-#' screener IDs; no names).
-#' @keywords internal
+# Things to follow up on in the tracking sheet
+#
+# Each check returns a short label, a count, and the IDs involved (RTH IDs or
+# screener IDs; no names).
 tracker_checks <- function(scr, tr, fam, steps, report_date, wait_days = 14, diary_days = 21) {
   chk <- list()
   add <- function(label, ids, help = "") chk[[length(chk) + 1]] <<- list(label = label, n = length(ids), ids = ids, help = help)
@@ -209,8 +203,7 @@ tracker_checks <- function(scr, tr, fam, steps, report_date, wait_days = 14, dia
 
 # Daily assessment completion -------------------------------------------------------------
 
-#' Completion counts for teens who did the lab visit (and their caregiver's night diaries)
-#' @keywords internal
+# Completion counts for teens who did the lab visit (and their caregiver's night diaries)
 completion_table <- function(tr, report_date) {
   teen <- tr[tr$role %in% "teen" & !is.na(tr$lab_date) & tr$lab_date <= report_date, , drop = FALSE]
   cg <- tr[tr$role %in% "caregiver", , drop = FALSE]
@@ -269,10 +262,9 @@ source_counts <- function(scr, sel = rep(TRUE, nrow(scr))) {
   factor(out, levels = c("Under 14", as.character(14:18), "Over 18", "Not answered"))
 }
 
-#' Screener demographics: % of eligible and % of not-eligible screeners per group
-#'
-#' Among completed screeners (finished, not blocked, not a possible bot).
-#' @keywords internal
+# Screener demographics: % of eligible and % of not-eligible screeners per group
+#
+# Among completed screeners (finished, not blocked, not a possible bot).
 screener_demographics <- function(scr) {
   base <- scr$completed
   el <- base & scr$eligible; ne <- base & !scr$eligible
@@ -289,12 +281,11 @@ screener_demographics <- function(scr) {
        income = tab(inc, c(union(.inc_screener, unique(stats::na.omit(scr$income))), "Not answered")))
 }
 
-#' Enrolled demographics: families whose teen did the lab visit
-#'
-#' Teen age at the lab visit (tracker), teen race/ethnicity (screener, via the
-#' screener ID), and from the caregiver interview: household income and the
-#' highest education of either caregiver.
-#' @keywords internal
+# Enrolled demographics: families whose teen did the lab visit
+#
+# Teen age at the lab visit (tracker), teen race/ethnicity (screener, via the
+# screener ID), and from the caregiver interview: household income and the
+# highest education of either caregiver.
 enrolled_demographics <- function(scr, tr, fam, ses, report_date) {
   done <- fam[fam$lab_done, , drop = FALSE]
   teen <- tr[tr$role %in% "teen", , drop = FALSE]

@@ -9,17 +9,16 @@
                 mode = "in person or remote", hours = "hours", amount = "amount",
                 what = "what / item", notes = "notes")
 
-#' Read the costs tab
-#'
-#' @param costs Google Sheets link, downloaded .xlsx, or data frame.
-#' @param sheet Tab name.
-#' @param hourly_rates Named hourly cost per person (names as in the person column).
-#' @return One row per expense or time entry, with \code{cost} in dollars
-#'   (Expense: the amount; Time: hours x the person's rate, or the amount if the
-#'   person has no rate; NA if neither). Undated rows (totals from before weekly
-#'   tracking) count toward all-time totals only. Stops with a list of cells to
-#'   fix if a date or number can't be read.
-#' @keywords internal
+# Read the costs tab
+#
+# costs: Google Sheets link, downloaded .xlsx, or data frame.
+# sheet: Tab name.
+# hourly_rates: Named hourly cost per person (names as in the person column).
+# Returns: One row per expense or time entry, with cost in dollars
+#   (Expense: the amount; Time: hours x the person's rate, or the amount if the
+#   person has no rate; NA if neither). Undated rows (totals from before weekly
+#   tracking) count toward all-time totals only. Stops with a list of cells to
+#   fix if a date or number can't be read.
 read_costs <- function(costs, sheet = "costs", hourly_rates) {
   raw <- .flatten_sheet(.tracker_raw(costs, sheet, must_have_tab = TRUE))
   k <- .key(names(raw))
@@ -61,13 +60,12 @@ read_costs <- function(costs, sheet = "costs", hourly_rates) {
                  what = ifelse(.is_blank(d$what), NA, d$what))
 }
 
-#' Cost summaries: by source (with fractional credit), by week, hours this week
-#'
-#' A screener who picked several sources gives each an equal share (2 sources:
-#' half each). General costs, and costs whose source isn't a screener choice,
-#' count only in the all-strategies total, which is divided by every screener
-#' (including those who gave no source).
-#' @keywords internal
+# Cost summaries: by source (with fractional credit), by week, hours this week
+#
+# A screener who picked several sources gives each an equal share (2 sources:
+# half each). General costs, and costs whose source isn't a screener choice,
+# count only in the all-strategies total, which is divided by every screener
+# (including those who gave no source).
 cost_summary <- function(cst, scr, steps, week, study_start) {
   keep <- !scr$screened_out
   src <- attr(scr, "sources")[keep, , drop = FALSE]
@@ -234,14 +232,13 @@ cost_html <- function(cs, week, wl, lmh = NULL, study_start, week_hours = 37.5) 
 
 # Lab manager hours ---------------------------------------------------------------------
 
-#' Read the "lab manager hours" tab: one row per day, one column per kind of work
-#'
-#' The recruitment columns are skipped (they're formulas copying the costs
-#' tab; recruitment hours are taken from the costs tab directly), as are day,
-#' total and notes.
-#' @return Long table: date, category, hours (categories in sheet order, as a
-#'   factor); notes as attribute "notes". NULL if the tab doesn't exist.
-#' @keywords internal
+# Read the "lab manager hours" tab: one row per day, one column per kind of work
+#
+# The recruitment columns are skipped (they're formulas copying the costs
+# tab; recruitment hours are taken from the costs tab directly), as are day,
+# total and notes.
+# Returns: Long table: date, category, hours (categories in sheet order, as a
+#   factor); notes as attribute "notes". NULL if the tab doesn't exist.
 read_lm_hours <- function(costs, sheet = "lab manager hours") {
   raw <- tryCatch(.flatten_sheet(.tracker_raw(costs, sheet, must_have_tab = TRUE)), error = function(e) {
     if (grepl("No '.*' tab|not found|Can't find", conditionMessage(e))) NULL else stop(e) })

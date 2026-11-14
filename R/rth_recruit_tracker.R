@@ -23,14 +23,13 @@
 .tracker_dates <- c("consent_date", "interview_date", "lab_sched_date", "lab_date", "survey_date")
 .key <- function(x) tolower(gsub("[^A-Za-z0-9]", "", x))
 
-#' Read the participant tracking sheet
-#'
-#' @param tracker Google Sheets link (read with googlesheets4), a downloaded
-#'   .xlsx, or a data frame.
-#' @param sheet Tab name.
-#' @return One row per person with an RTH ID. Stops with a list of cells to fix
-#'   if a date isn't written like 10/24/2026.
-#' @keywords internal
+# Read the participant tracking sheet
+#
+# tracker: Google Sheets link (read with googlesheets4), a downloaded
+#   .xlsx, or a data frame.
+# sheet: Tab name.
+# Returns: One row per person with an RTH ID. Stops with a list of cells to fix
+#   if a date isn't written like 10/24/2026.
 read_tracker <- function(tracker, sheet = "tracking") {
   raw <- .flatten_sheet(.tracker_raw(tracker, sheet))
   k <- .key(names(raw))
@@ -139,12 +138,11 @@ read_tracker <- function(tracker, sheet = "tracking") {
   gsub("&amp;", "&", x, fixed = TRUE)
 }
 
-#' One row per family: screener ID and the dates of each step
-#'
-#' Caregiver steps (consent, interview, caregiver survey) come from the
-#' caregiver row (RTH ID ending in 2); lab visit dates from the teen row
-#' (ending in 1). If a family has only one row, that row is used.
-#' @keywords internal
+# One row per family: screener ID and the dates of each step
+#
+# Caregiver steps (consent, interview, caregiver survey) come from the
+# caregiver row (RTH ID ending in 2); lab visit dates from the teen row
+# (ending in 1). If a family has only one row, that row is used.
 tracker_families <- function(tr, report_date) {
   tr <- tr[!is.na(tr$family), , drop = FALSE]
   fams <- unique(tr$family)
@@ -178,9 +176,8 @@ tracker_families <- function(tr, report_date) {
                 "High school diploma or equivalency (GED)", "Some college", "Associate's Degree",
                 "Bachelor's Degree", "Master's Degree", "Doctorate or Professional Degree")
 
-#' Read the caregiver SES interview: highest education of both caregivers and
-#' household income, one row per family
-#' @keywords internal
+# Read the caregiver SES interview: highest education of both caregivers and
+# household income, one row per family
 read_interview_ses <- function(path) {
   raw <- .drop_previews(haven::read_sav(path))
   sid <- .find_col(raw, "SID")
@@ -206,12 +203,11 @@ read_interview_ses <- function(path) {
 
 # Race/ethnicity scoring ---------------------------------------------------------------------
 
-#' Score the select-all race/ethnicity item
-#'
-#' One choice: "Monoracial <race>". More than one: "Multiracial Black" if Black
-#' is among them; otherwise "Multiracial Hispanic/Latino" if Hispanic/Latino is;
-#' otherwise "Multiracial Asian" if Asian is; otherwise "Multiracial, another race".
-#' @keywords internal
+# Score the select-all race/ethnicity item
+#
+# One choice: "Monoracial <race>". More than one: "Multiracial Black" if Black
+# is among them; otherwise "Multiracial Hispanic/Latino" if Hispanic/Latino is;
+# otherwise "Multiracial Asian" if Asian is; otherwise "Multiracial, another race".
 score_race <- function(race) {
   nm <- colnames(race)
   short <- c("American Indian or Alaska Native" = "American Indian/Alaska Native",
@@ -230,11 +226,10 @@ score_race <- function(race) {
     TRUE ~ "Multiracial, another race")
 }
 
-#' Screener IDs on the tracker's "sus bots" tab
-#'
-#' Reads the "Screener ID" column (matched loosely). Returns NULL if the tab
-#' doesn't exist (or the tracker was given as a data frame).
-#' @keywords internal
+# Screener IDs on the tracker's "sus bots" tab
+#
+# Reads the "Screener ID" column (matched loosely). Returns NULL if the tab
+# doesn't exist (or the tracker was given as a data frame).
 read_sus_bots <- function(tracker, sheet = "sus bots") {
   if (is.data.frame(tracker)) return(NULL)
   raw <- tryCatch(.flatten_sheet(.tracker_raw(tracker, sheet, must_have_tab = TRUE)), error = function(e) {

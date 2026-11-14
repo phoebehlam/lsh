@@ -1,51 +1,52 @@
 # Weekly recruitment report ------------------------------------------------------
 
-#' Render the weekly Rise to Health recruitment report (staff use)
-#'
-#' Reads the screener export and the participant tracking sheet (Google Sheet
-#' or downloaded .xlsx), plus optionally the caregiver SES interview for
-#' enrolled-family demographics, and writes one self-contained HTML file.
-#' Names, emails and phone numbers are never shown.
-#'
-#' @param screener_sav  Prescreen export (.sav).
-#' @param tracker Participant tracking sheet: the Google Sheets link (needs the
-#'   googlesheets4 package; sign in once in the browser) or a downloaded .xlsx.
-#' @param interview_sav Optional caregiver SES interview export (.sav), for
-#'   household income and caregiver education of enrolled families.
-#' @param out_dir Folder for the report.
-#' @param week Study week to report on. Default: the last full week (Friday
-#'   to Thursday) before \code{report_date}, so a report run on a Friday
-#'   covers the week that ended the day before.
-#' @param report_date Date of the run (default today).
-#' @param study_start First day of week 1 (a Friday; weeks run Friday to
-#'   Thursday).
-#' @param seed_sheet Optional: the old weekly counts sheet (.tsv/.csv/.xlsx),
-#'   for lab visits scheduled in weeks before the tracker logged booking dates.
-#' @param tracker_tab Tab of the tracking sheet to read.
-#' @param costs TRUE to add the Costs section (needs \code{costs_sheet});
-#'   FALSE (default) leaves it out of the report entirely.
-#' @param costs_sheet The RTH recruitment costs & hours sheet (Google Sheets
-#'   link or downloaded .xlsx). Only read when \code{costs = TRUE}.
-#' @param costs_tab Tab of the costs sheet to read.
-#' @param hourly_rates Hourly cost of staff time, named as in the sheet's
-#'   person column. Lab manager: $21.50/hour plus CMU's FY2027 fringe rate for
-#'   full-time domestic staff (25.6\%) = $27.00. Grad student: $30,000 a year
-#'   for about 10 hours a week (30000 / 520 = $57.69). Time logged for anyone
-#'   else is costed with the amount column instead. These rates aren't printed
-#'   in the report.
-#' @param lm_hours_tab Tab of the costs sheet where the lab manager logs his
-#'   other hours, for the "Lab manager's week" bar.
-#' @param lm_week_hours Hours in the lab manager's full work week.
-#' @param bots_tab Tab of the tracking sheet listing screener IDs that are
-#'   bots ("Screener ID" column). Those screeners count as possible bots
-#'   whatever their answers. Skipped if the tab doesn't exist.
-#' @param source_groups Screener sources to report together, as
-#'   c("screener choice" = "group"). Default: mail and bus ads as "Local:
-#'   Direct mail + Bus ad"; the candy stickers, paper flyers and tabling as
-#'   "Local: treats + flyers + tabling" (in the costs section too). Use
-#'   \code{character()} to report every choice separately.
-#' @return Path to the HTML report (invisibly).
+# Render the weekly Rise to Health recruitment report (staff use)
+#
+# Reads the screener export and the participant tracking sheet (Google Sheet
+# or downloaded .xlsx), plus optionally the caregiver SES interview for
+# enrolled-family demographics, and writes one self-contained HTML file.
+# Names, emails and phone numbers are never shown.
+#
+# screener_sav: Prescreen export (.sav).
+# tracker: Participant tracking sheet: the Google Sheets link (needs the
+#   googlesheets4 package; sign in once in the browser) or a downloaded .xlsx.
+# interview_sav: Optional caregiver SES interview export (.sav), for
+#   household income and caregiver education of enrolled families.
+# out_dir: Folder for the report.
+# week: Study week to report on. Default: the last full week (Friday
+#   to Thursday) before report_date, so a report run on a Friday
+#   covers the week that ended the day before.
+# report_date: Date of the run (default today).
+# study_start: First day of week 1 (a Friday; weeks run Friday to
+#   Thursday).
+# seed_sheet: Optional: the old weekly counts sheet (.tsv/.csv/.xlsx),
+#   for lab visits scheduled in weeks before the tracker logged booking dates.
+# tracker_tab: Tab of the tracking sheet to read.
+# costs: TRUE to add the Costs section (needs costs_sheet);
+#   FALSE (default) leaves it out of the report entirely.
+# costs_sheet: The RTH recruitment costs & hours sheet (Google Sheets
+#   link or downloaded .xlsx). Only read when costs = TRUE.
+# costs_tab: Tab of the costs sheet to read.
+# hourly_rates: Hourly cost of staff time, named as in the sheet's
+#   person column. Lab manager: $21.50/hour plus CMU's FY2027 fringe rate for
+#   full-time domestic staff (25.6%) = $27.00. Grad student: $30,000 a year
+#   for about 10 hours a week (30000 / 520 = $57.69). Time logged for anyone
+#   else is costed with the amount column instead. These rates aren't printed
+#   in the report.
+# lm_hours_tab: Tab of the costs sheet where the lab manager logs his
+#   other hours, for the "Lab manager's week" bar.
+# lm_week_hours: Hours in the lab manager's full work week.
+# bots_tab: Tab of the tracking sheet listing screener IDs that are
+#   bots ("Screener ID" column). Those screeners count as possible bots
+#   whatever their answers. Skipped if the tab doesn't exist.
+# source_groups: Screener sources to report together, as
+#   c("screener choice" = "group"). Default: mail and bus ads as "Local:
+#   Direct mail + Bus ad"; the candy stickers, paper flyers and tabling as
+#   "Local: treats + flyers + tabling" (in the costs section too). Use
+#   character() to report every choice separately.
+# Returns: Path to the HTML report (invisibly).
 #' @export
+#' @noRd
 render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, out_dir = ".",
                                    week = NULL, report_date = Sys.Date(),
                                    study_start = as.Date("2026-04-24"), seed_sheet = NULL,

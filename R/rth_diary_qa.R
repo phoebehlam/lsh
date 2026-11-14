@@ -1,38 +1,37 @@
 # Weekly diary QA: duplicate, binged and late diary entries ----------------------
 
-#' Settings for the weekly diary QA
-#'
-#' Change a setting with \code{s <- rth_diary_qa_settings(); s$r3_until <- 20},
-#' then pass \code{settings = s} to \code{\link{rth_diary_qa}}.
-#'
-#' @return A list:
-#' \describe{
-#'   \item{n_days}{Diary days per participant (15). Extra days are allowed; this only sets how many
-#'     nights/days the report lists.}
-#'   \item{night_cutoff}{Night diaries started before this hour count for the previous night (12).
-#'     Also the start of compliance 3 the next day.}
-#'   \item{night_ontime_until}{Night diaries started the next day before this hour are on time (4).}
-#'   \item{r1_max_gap}{R1: entries move back only into a run of at most this many empty nights/days (3)
-#'     right before the date. A longer gap is left as is.}
-#'   \item{r2_evening_from}{R2 (night diaries): when every entry on the date was started from this hour (16)
-#'     on the date itself, keep the one closest to the participant's usual start time.}
-#'   \item{typical_min_n}{Usual start time = median of the participant's entries that are alone on their
-#'     date; needs at least this many (3), otherwise R2 keeps the earliest.}
-#'   \item{restart_minutes}{R0: an unfinished entry followed by another within this many minutes (30) is
-#'     a restart and is dropped.}
-#'   \item{binge_hours}{Compliance 4: entries for the same date each started within this many hours (2)
-#'     of the previous one count as one sitting. When 2+ entries of a sitting are all kept (spread over
-#'     different nights/days), they all get compliance 4.}
-#'   \item{r3_from, r3_until}{R3: a single night entry started between these hours (12 to 19, i.e. before
-#'     the night diary link usually goes out) moves back one night when that night is empty.}
-#'   \item{morning_cutoff}{Morning diaries started before this hour count for the previous day (4).}
-#'   \item{morning_ontime_until}{Morning diaries started before this hour are on time (14).}
-#'   \item{keep_status}{Qualtrics Status codes kept: 0 = real response, 4 = imported, 16 = offline.
-#'     Previews and tests are left out and listed in the report.}
-#'   \item{compare_items}{Answers compared between two entries for the same night/day, to tell a
-#'     resubmission (identical answers) from a separate attempt.}
-#' }
+# Settings for the weekly diary QA
+#
+# Change a setting with s <- rth_diary_qa_settings(); s$r3_until <- 20,
+# then pass settings = s to rth_diary_qa.
+#
+# Returns: A list:
+#   - n_days: Diary days per participant (15). Extra days are allowed; this only sets how many
+#     nights/days the report lists.
+#   - night_cutoff: Night diaries started before this hour count for the previous night (12).
+#     Also the start of compliance 3 the next day.
+#   - night_ontime_until: Night diaries started the next day before this hour are on time (4).
+#   - r1_max_gap: R1: entries move back only into a run of at most this many empty nights/days (3)
+#     right before the date. A longer gap is left as is.
+#   - r2_evening_from: R2 (night diaries): when every entry on the date was started from this hour (16)
+#     on the date itself, keep the one closest to the participant's usual start time.
+#   - typical_min_n: Usual start time = median of the participant's entries that are alone on their
+#     date; needs at least this many (3), otherwise R2 keeps the earliest.
+#   - restart_minutes: R0: an unfinished entry followed by another within this many minutes (30) is
+#     a restart and is dropped.
+#   - binge_hours: Compliance 4: entries for the same date each started within this many hours (2)
+#     of the previous one count as one sitting. When 2+ entries of a sitting are all kept (spread over
+#     different nights/days), they all get compliance 4.
+#   - r3_from, r3_until: R3: a single night entry started between these hours (12 to 19, i.e. before
+#     the night diary link usually goes out) moves back one night when that night is empty.
+#   - morning_cutoff: Morning diaries started before this hour count for the previous day (4).
+#   - morning_ontime_until: Morning diaries started before this hour are on time (14).
+#   - keep_status: Qualtrics Status codes kept: 0 = real response, 4 = imported, 16 = offline.
+#     Previews and tests are left out and listed in the report.
+#   - compare_items: Answers compared between two entries for the same night/day, to tell a
+#     resubmission (identical answers) from a separate attempt.
 #' @export
+#' @noRd
 rth_diary_qa_settings <- function() {
   list(
     n_days = 15,
@@ -55,77 +54,73 @@ rth_diary_qa_settings <- function() {
                   "waketime_am.pm", "rested", "quality", "watchwear", "remove_watch")))
 }
 
-#' Weekly QA of the Rise to Health diaries (duplicate, binged and late entries)
-#'
-#' Run it twice each week with the three Qualtrics exports, as downloaded
-#' (never edited).
-#'
-#' \strong{Step 1} (no \code{proposals}): tags entries that need a look, proposes
-#' what to do with each, and writes an HTML report plus a proposals workbook
-#' with one tab per diary. Entries already in the decisions log are not
-#' proposed again.
-#'
-#' \strong{Step 2} (\code{proposals} = the reviewed workbook): checks the
-#' edits, adds them to the decisions log, and writes the clean data: one .sav
-#' per diary with every response (previews left out), one row per ID, and these
-#' columns added at the end: \code{id}, \code{diary_date}, \code{should_date},
-#' \code{should_day}, \code{compliance}, \code{exclude} (1 = dropped; leave out
-#' of analyses), \code{qa_rule}, \code{qa_action}, \code{qa_source}.
-#'
-#' The caregiver diary's externalreference can hold two IDs for a caregiver
-#' with two teens ("1212, 1172"). Their entries are reviewed once and the
-#' decision applies to both; the clean data has one row per ID.
-#'
-#' Dates and compliance:
-#' \itemize{
-#'   \item Night diaries (caregiver and adolescent): started before 12:00 counts
-#'     for the previous night. Compliance 1 = on time (by 04:00 the next day),
-#'     2 = 04:00-11:59 the next day, 3 = 12:00 the next day or later.
-#'   \item Morning diary: started before 04:00 counts for the previous day.
-#'     Compliance 1 = before 14:00, 2 = 14:00-23:59, 3 = the next day or later.
-#'   \item Both: compliance 4 = binged. Entries for the same date done in one sitting (each started
-#'     within 2 hours of the previous one) and all kept, spread over different nights/days. If any
-#'     entry of the sitting is dropped, the kept one gets its usual code.
-#' }
-#' Tagging rules, per participant and night/day:
-#' \itemize{
-#'   \item R0: an entry with no answers, or an unfinished entry restarted within 30 minutes: drop it.
-#'     (Other unfinished entries count like any entry: partial data are kept.)
-#'   \item R1: 2+ entries and 1-3 empty nights/days right before: the earliest entries fill them, one each,
-#'     nearest first. On a participant's first date, one night-diary entry started 12:00-19:00 can move to
-#'     the night before.
-#'   \item R2: 2+ entries left: keep one, drop the rest. Night entries all started after 16:00 on the date:
-#'     the one closest to the participant's usual start time; otherwise the earliest (finished ones first).
-#'   \item R3 (night diaries): one entry started 12:00-19:00 and the night before is empty (not the
-#'     participant's first entry): it moves back one night.
-#'   \item R99: anything else that looks off (e.g. an entry that took 0 seconds): needs a decision.
-#' }
-#'
-#' @param caregiver_night,adolescent_night,adolescent_morning Paths to this
-#'   week's Qualtrics exports (.sav). Leave one out (NULL) to skip that diary.
-#' @param proposals Path to the reviewed proposals workbook (.xlsx) from step 1.
-#'   NULL (default) runs step 1.
-#' @param log The decisions log (.xlsx). Default: \code{rth_diary_qa_decisions_log.xlsx}
-#'   in \code{out_dir}. Created in the first step 2 run; keep using the same file every week.
-#' @param out_dir Folder for the report, proposals and clean data.
-#' @param run_date Date used in file names (default today).
-#' @param settings From \code{\link{rth_diary_qa_settings}}.
-#' @return Step 1: path to the report (invisibly). Step 2: a named list of the clean data (invisibly).
-#' @examples
-#' \dontrun{
-#' # step 1
-#' rth_diary_qa(caregiver_night    = "rth_caregiver night diary_November 5, 2026_13.14.sav",
-#'              adolescent_night   = "rth_adolescent night diary_November 5, 2026_13.15.sav",
-#'              adolescent_morning = "rth_adolescent morning diary_November 5, 2026_13.15.sav",
-#'              out_dir = "diary qa")
-#' # review diary qa/rth_diary_qa_proposals_2026-11-06.xlsx, then step 2
-#' rth_diary_qa(caregiver_night    = "rth_caregiver night diary_November 5, 2026_13.14.sav",
-#'              adolescent_night   = "rth_adolescent night diary_November 5, 2026_13.15.sav",
-#'              adolescent_morning = "rth_adolescent morning diary_November 5, 2026_13.15.sav",
-#'              proposals = "diary qa/rth_diary_qa_proposals_2026-11-06.xlsx",
-#'              out_dir = "diary qa")
-#' }
+# Weekly QA of the Rise to Health diaries (duplicate, binged and late entries)
+#
+# Run it twice each week with the three Qualtrics exports, as downloaded
+# (never edited).
+#
+# Step 1 (no proposals): tags entries that need a look, proposes
+# what to do with each, and writes an HTML report plus a proposals workbook
+# with one tab per diary. Entries already in the decisions log are not
+# proposed again.
+#
+# Step 2 (proposals = the reviewed workbook): checks the
+# edits, adds them to the decisions log, and writes the clean data: one .sav
+# per diary with every response (previews left out), one row per ID, and these
+# columns added at the end: id, diary_date, should_date,
+# should_day, compliance, exclude (1 = dropped; leave out
+# of analyses), qa_rule, qa_action, qa_source.
+#
+# The caregiver diary's externalreference can hold two IDs for a caregiver
+# with two teens ("1212, 1172"). Their entries are reviewed once and the
+# decision applies to both; the clean data has one row per ID.
+#
+# Dates and compliance:
+#   - Night diaries (caregiver and adolescent): started before 12:00 counts
+#     for the previous night. Compliance 1 = on time (by 04:00 the next day),
+#     2 = 04:00-11:59 the next day, 3 = 12:00 the next day or later.
+#   - Morning diary: started before 04:00 counts for the previous day.
+#     Compliance 1 = before 14:00, 2 = 14:00-23:59, 3 = the next day or later.
+#   - Both: compliance 4 = binged. Entries for the same date done in one sitting (each started
+#     within 2 hours of the previous one) and all kept, spread over different nights/days. If any
+#     entry of the sitting is dropped, the kept one gets its usual code.
+# Tagging rules, per participant and night/day:
+#   - R0: an entry with no answers, or an unfinished entry restarted within 30 minutes: drop it.
+#     (Other unfinished entries count like any entry: partial data are kept.)
+#   - R1: 2+ entries and 1-3 empty nights/days right before: the earliest entries fill them, one each,
+#     nearest first. On a participant's first date, one night-diary entry started 12:00-19:00 can move to
+#     the night before.
+#   - R2: 2+ entries left: keep one, drop the rest. Night entries all started after 16:00 on the date:
+#     the one closest to the participant's usual start time; otherwise the earliest (finished ones first).
+#   - R3 (night diaries): one entry started 12:00-19:00 and the night before is empty (not the
+#     participant's first entry): it moves back one night.
+#   - R99: anything else that looks off (e.g. an entry that took 0 seconds): needs a decision.
+#
+# caregiver_night, adolescent_night, adolescent_morning: Paths to this
+#   week's Qualtrics exports (.sav). Leave one out (NULL) to skip that diary.
+# proposals: Path to the reviewed proposals workbook (.xlsx) from step 1.
+#   NULL (default) runs step 1.
+# log: The decisions log (.xlsx). Default: rth_diary_qa_decisions_log.xlsx
+#   in out_dir. Created in the first step 2 run; keep using the same file every week.
+# out_dir: Folder for the report, proposals and clean data.
+# run_date: Date used in file names (default today).
+# settings: From rth_diary_qa_settings.
+# Returns: Step 1: path to the report (invisibly). Step 2: a named list of the clean data (invisibly).
+# Example:
+# \dontrun{
+# # step 1
+# rth_diary_qa(caregiver_night    = "rth_caregiver night diary_November 5, 2026_13.14.sav",
+#              adolescent_night   = "rth_adolescent night diary_November 5, 2026_13.15.sav",
+#              adolescent_morning = "rth_adolescent morning diary_November 5, 2026_13.15.sav",
+#              out_dir = "diary qa")
+# # review diary qa/rth_diary_qa_proposals_2026-11-06.xlsx, then step 2
+# rth_diary_qa(caregiver_night    = "rth_caregiver night diary_November 5, 2026_13.14.sav",
+#              adolescent_night   = "rth_adolescent night diary_November 5, 2026_13.15.sav",
+#              adolescent_morning = "rth_adolescent morning diary_November 5, 2026_13.15.sav",
+#              proposals = "diary qa/rth_diary_qa_proposals_2026-11-06.xlsx",
+#              out_dir = "diary qa")
 #' @export
+#' @noRd
 rth_diary_qa <- function(caregiver_night = NULL, adolescent_night = NULL, adolescent_morning = NULL,
                          proposals = NULL, log = NULL, out_dir = ".", run_date = Sys.Date(),
                          settings = rth_diary_qa_settings()) {
