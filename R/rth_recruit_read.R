@@ -198,9 +198,11 @@ read_screener <- function(path, approved = character(), bots = character()) {
 
 # Source groups -----------------------------------------------------------------------
 
-.rth_source_groups <- c("Paper flyer" = "Local recruitment", "Mail" = "Local recruitment",
-                        "Bus ads" = "Local recruitment", "Halloween candy sticker" = "Local recruitment",
-                        "Candy / Gatorade Sticker" = "Local recruitment")
+.rth_source_groups <- c("Mail" = "Local: Direct mail + Bus ad", "Bus ads" = "Local: Direct mail + Bus ad",
+                        "Halloween candy sticker" = "Local: treats + flyers + tabling",
+                        "Candy / Gatorade Sticker" = "Local: treats + flyers + tabling",
+                        "Paper flyer" = "Local: treats + flyers + tabling",
+                        "Tabling" = "Local: treats + flyers + tabling")
 
 # Rename sources to their group (names matched loosely); others stay as they are
 .map_source <- function(x, groups) {
@@ -210,7 +212,7 @@ read_screener <- function(path, approved = character(), bots = character()) {
 }
 
 # Combine the screener's source columns into groups: a family that picked
-# Mail and Paper flyer counts once for Local recruitment
+# Mail and Bus ads counts once for "Local: Direct mail + Bus ad"
 .group_sources <- function(scr, groups) {
   src <- attr(scr, "sources")
   if (!length(groups) || !ncol(src)) return(scr)

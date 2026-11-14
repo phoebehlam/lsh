@@ -40,9 +40,10 @@
 #'   bots ("Screener ID" column). Those screeners count as possible bots
 #'   whatever their answers. Skipped if the tab doesn't exist.
 #' @param source_groups Screener sources to report together, as
-#'   c("screener choice" = "group"). Default: paper flyers, mail, bus ads and
-#'   the candy stickers are grouped as "Local recruitment" (in the costs
-#'   section too). Use \code{character()} to report every choice separately.
+#'   c("screener choice" = "group"). Default: mail and bus ads as "Local:
+#'   Direct mail + Bus ad"; the candy stickers, paper flyers and tabling as
+#'   "Local: treats + flyers + tabling" (in the costs section too). Use
+#'   \code{character()} to report every choice separately.
 #' @return Path to the HTML report (invisibly).
 #' @export
 render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, out_dir = ".",
@@ -127,23 +128,26 @@ render_rth_recruitment <- function(screener_sav, tracker, interview_sav = NULL, 
                 "Lab visit scheduled", "Lab visit done")
 
 # Okabe-Ito colors: easy to tell apart, colorblind-safe
-.src_cols <- c("#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9", "#9CA3AF")
+.src_cols <- c("#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9", "#D55E00", "#882255", "#9CA3AF")
+.max_src <- 7   # more sources than this: the smallest are combined
 
+.rest_label <- "Smaller sources, combined"
 plot_source_weeks <- function(scr, sw, weeks, top) {
   keep <- scr$completed
   src <- attr(scr, "sources")[keep, , drop = FALSE]; w <- sw[keep]
-  grp <- c(top, "Remaining sources")
+  rest <- setdiff(colnames(src), top)
+  grp <- c(top, if (length(rest)) .rest_label)
   d <- do.call(rbind, lapply(weeks, function(k) {
     s <- src[!is.na(w) & w == k, , drop = FALSE]
-    v <- c(colSums(s[, intersect(top, colnames(s)), drop = FALSE]),
-           `Remaining sources` = sum(s[, setdiff(colnames(s), top), drop = FALSE]))
+    v <- colSums(s[, intersect(top, colnames(s)), drop = FALSE])
+    if (length(rest)) v <- c(v, stats::setNames(sum(s[, rest, drop = FALSE]), .rest_label))
     data.frame(week = k, source = factor(names(v), levels = rev(grp)), n = as.numeric(v))
   }))
   ggplot2::ggplot(d, ggplot2::aes(factor(week), n, fill = source)) +
     ggplot2::geom_col(width = .75) +
-    ggplot2::scale_fill_manual(values = stats::setNames(rev(.src_cols[seq_along(grp)]), rev(grp)),
+    ggplot2::scale_fill_manual(values = stats::setNames(c(.src_cols[seq_along(top)], if (length(rest)) "#9CA3AF"), grp),
                                breaks = grp, name = NULL) +
-    ggplot2::guides(fill = ggplot2::guide_legend(nrow = 1)) +
+    ggplot2::guides(fill = ggplot2::guide_legend(nrow = if (length(grp) > 4) 2 else 1, byrow = TRUE)) +
     ggplot2::labs(x = "Study week", y = "Completed screeners (by source)") +
     ggplot2::theme_minimal(base_size = 9) +
     ggplot2::theme(legend.position = "top", panel.grid.major.x = ggplot2::element_blank(),
@@ -229,7 +233,7 @@ plot_completion <- function(ct) {
           else if (no_score) sprintf(" %d screeners have no score (from before scores were saved).", no_score) else "")
 }
 
-# "Local recruitment = Paper flyer, Mail, ..." for each group in the report
+# "Local: Direct mail + Bus ad = Mail, Bus ads; ..." for each group in the report
 .groups_note <- function(groups, shown) {
   g <- intersect(unique(unname(groups)), shown)
   txt <- vapply(g, function(k) sprintf("<b>%s</b> = %s", .esc(k), .esc(paste(names(groups)[groups == k], collapse = ", "))), "")
@@ -310,14 +314,18 @@ recruitment_html <- function(scr, tr, fam, ses, steps, wk_tab, week, study_start
 
   # Sources ----
   src_a <- source_counts(scr)
-  top <- utils::head(setdiff(names(src_a), "No source given"), 5)
+  # every source, unless there are too many to tell apart by color
+  srcs <- setdiff(names(src_a)[src_a > 0], "No source given")
+  top <- utils::head(srcs, if (length(srcs) > .max_src) .max_src - 1 else .max_src)
+  rest <- setdiff(colnames(attr(scr, "sources")), top)
+  has_rest <- length(setdiff(srcs, top)) > 0
   chart <- if (length(top)) img_tag(plot_source_weeks(scr, sw, max(1, week - 11):week, top), height = 3, width = 9,
                                     alt = "Screeners by week and source") else '<p class="note">No sources reported yet.</p>'
   srcm <- attr(scr, "sources")[scr$completed, , drop = FALSE]; swn <- sw[scr$completed]
-  vrow <- function(s) c(colSums(s[, top, drop = FALSE]), sum(s[, setdiff(colnames(s), top), drop = FALSE]), sum(rowSums(s) == 0))
+  vrow <- function(s) c(colSums(s[, top, drop = FALSE]), if (has_rest) sum(s[, rest, drop = FALSE]), sum(rowSums(s) == 0))
   wks <- rev(sort(unique(stats::na.omit(swn[swn <= week]))))
   body <- vapply(wks, function(k) paste0("<tr>", .wk_cell(k, wl), paste(.td(vrow(srcm[!is.na(swn) & swn == k, , drop = FALSE])), collapse = ""), "</tr>"), "")
-  src_tab <- .table("t-src", c("Week", top, "Remaining sources", "No source given"), body,
+  src_tab <- .table("t-src", c("Week", top, if (has_rest) .rest_label, "No source given"), body,
                     paste0("<td>Total</td>", paste0("<td>", vrow(srcm), "</td>", collapse = "")))
   wi <- attr(scr, "writein")
   wi <- wi[!scr$screened_out[wi$row], , drop = FALSE]

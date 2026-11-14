@@ -310,24 +310,30 @@ test_that("conversion never passes 100%, even with missing consent dates and non
   expect_equal(n[["Interview, survey or lab visit date but no consent date"]], 4L)   # families 901 and 902
 })
 
-test_that("Local recruitment groups flyers, mail, bus ads and candy stickers everywhere", {
+test_that("local sources are grouped into 'Direct mail + Bus ad' and 'treats + flyers + tabling' everywhere", {
+  g1 <- "Local: Direct mail + Bus ad"; g2 <- "Local: treats + flyers + tabling"
   s <- read_screener(rec_ex("sim_prescreen.sav"))
   raw <- attr(s, "sources")
-  g <- .group_sources(s, .rth_source_groups)
-  src <- attr(g, "sources")
-  expect_true("Local recruitment" %in% colnames(src))
-  expect_false(any(c("Paper flyer", "Mail", "Bus ads", "Halloween candy sticker") %in% colnames(src)))
-  loc <- c("Paper flyer", "Mail", "Bus ads", "Halloween candy sticker")
-  expect_equal(sum(src[, "Local recruitment"]), sum(rowSums(raw[, intersect(loc, colnames(raw)), drop = FALSE]) > 0))
-  expect_equal(.map_source(c("paper flyer", "Bus Ads", "Facebook", "General"), .rth_source_groups),
-               c("Local recruitment", "Local recruitment", "Facebook", "General"))
+  src <- attr(.group_sources(s, .rth_source_groups), "sources")
+  expect_true(all(c(g1, g2) %in% colnames(src)))
+  expect_false(any(c("Paper flyer", "Mail", "Bus ads", "Halloween candy sticker", "Tabling") %in% colnames(src)))
+  in1 <- intersect(c("Mail", "Bus ads"), colnames(raw))
+  in2 <- intersect(c("Paper flyer", "Halloween candy sticker", "Candy / Gatorade Sticker", "Tabling"), colnames(raw))
+  expect_equal(sum(src[, g1]), sum(rowSums(raw[, in1, drop = FALSE]) > 0))      # a family who picked both counts once
+  expect_equal(sum(src[, g2]), sum(rowSums(raw[, in2, drop = FALSE]) > 0))
+  expect_equal(.map_source(c("Mail", "bus ads", "Paper flyer", "Tabling", "Halloween Candy Sticker", "Facebook", "General"), .rth_source_groups),
+               c(g1, g1, g2, g2, g2, "Facebook", "General"))
   d <- file.path(tempdir(), "rec_grp"); unlink(d, recursive = TRUE)
   p <- suppressMessages(render_rth_recruitment(rec_ex("sim_prescreen.sav"), rec_ex("sim_tracking.xlsx"), out_dir = d,
                                                report_date = rd, costs = TRUE, costs_sheet = rec_ex("sim_costs.xlsx")))
   h <- paste(readLines(p, warn = FALSE), collapse = " ")
-  expect_match(h, "<td>Local recruitment</td>")
+  expect_match(h, sprintf("<td>%s</td>", g1), fixed = TRUE); expect_match(h, sprintf("<td>%s</td>", g2), fixed = TRUE)
   expect_false(grepl("<td>Paper flyer</td>|<span>Bus ads</span>|<span>Paper flyer</span>", h))
   expect_match(h, "Lab visit scheduled")
+  # with this few sources, every one gets its own column: no combined bucket
+  expect_false(grepl("Smaller sources, combined|Remaining sources", h))
+  for (x in setdiff(colnames(src)[colSums(src[s$completed, , drop = FALSE]) > 0], character()))
+    expect_match(h, sprintf('id="t-src"><thead><tr>(?:(?!</tr>).)*%s', gsub("([+().])", "\\\\\\1", x)), perl = TRUE)
   # every choice reported separately when asked
   p2 <- suppressMessages(render_rth_recruitment(rec_ex("sim_prescreen.sav"), rec_ex("sim_tracking.xlsx"), out_dir = d,
                                                 report_date = rd, source_groups = character()))
@@ -379,7 +385,7 @@ test_that("all screeners vs completed screeners; every % starts from completed",
   expect_equal(sc[["Facebook"]], sum(src[s$completed, "Facebook"]))
   expect_equal(sum(sc[names(sc) == "No source given"]), sum(s$completed & rowSums(src) == 0))
   expect_match(h, "completed screeners only")
-  expect_match(h, "<b>Local recruitment</b> = Paper flyer, Mail, Bus ads, Halloween candy sticker, Candy / Gatorade Sticker")
+  expect_match(h, "<b>Local: Direct mail \\+ Bus ad</b> = Mail, Bus ads; <b>Local: treats \\+ flyers \\+ tabling</b> = Halloween candy sticker, Candy / Gatorade Sticker, Paper flyer, Tabling")
 })
 
 test_that("screener demographics use completed screeners only", {
